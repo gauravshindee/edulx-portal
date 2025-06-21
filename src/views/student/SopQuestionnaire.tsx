@@ -102,7 +102,7 @@ const SopQuestionnaire = () => {
 
   // --- Progress Bar Calculation ---
   const totalQuestions = SOP_QUESTIONS.length;
-  const answeredQuestions = Object.entries(form).filter(([key, value]) => {
+  const answeredQuestions = Object.entries(form).filter(([_key, value]) => { // Added _key to mark as unused
     // A question is "answered" if its string value is not empty after trimming
     return typeof value === 'string' && value.trim() !== '';
   }).length;
@@ -112,10 +112,10 @@ const SopQuestionnaire = () => {
   // --- End Progress Bar Calculation ---
 
   return (
-    <div className="p-6 max-w-4xl mx-auto relative">
+    <div className="p-6 max-w-4xl mx-auto relative dark:bg-darkgray rounded-xl shadow-md"> {/* Added dark mode background and shadow */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-4">
         <div className="mb-4 md:mb-0 flex-1">
-          <h2 className="text-2xl font-bold mb-2">✍️ SOP Questionnaire</h2>
+          <h2 className="text-2xl font-bold mb-2 text-dark dark:text-white">✍️ SOP Questionnaire</h2>
           <Progress
             percent={completionPercentage}
             status={completionPercentage === 100 ? 'success' : 'active'}
@@ -125,35 +125,35 @@ const SopQuestionnaire = () => {
               to: '#FBCC32',   // Yellow/gold
             }}
           />
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 mt-1 dark:text-gray-400"> {/* Dark mode text color */}
             ({missingQuestions} Questions Still Unanswered)
           </p>
         </div>
         <div className="md:ml-auto"> {/* Aligns the save button to the right on desktop */}
             <button
                 onClick={handleSave}
-                className="bg-primary hover:bg-yellow-500 text-white px-6 py-2 rounded shadow transition"
+                className="bg-primary hover:bg-yellow-500 text-white px-6 py-2 rounded shadow transition dark:bg-primary-dark dark:hover:bg-yellow-600" // Dark mode for button
             >
                 Save Responses
             </button>
         </div>
       </div>
 
-      {status && <p className="mt-4 text-sm text-blue-600 text-center">{status}</p>}
+      {status && <p className="mt-4 text-sm text-blue-600 text-center dark:text-blue-400">{status}</p>} {/* Dark mode for status text */}
 
       <div className="space-y-6 mt-6">
         {SOP_QUESTIONS.map((q) => (
-          <div key={q.id} className="border p-4 rounded-xl bg-white shadow-sm">
-            <label htmlFor={q.id} className="block text-md font-medium text-gray-700 mb-2">
+          <div key={q.id} className="border p-4 rounded-xl bg-white shadow-sm dark:bg-darkgray-700 dark:border-gray-700"> {/* Dark mode for card */}
+            <label htmlFor={q.id} className="block text-md font-medium text-gray-700 mb-2 dark:text-white"> {/* Dark mode for label */}
               {SOP_QUESTIONS.findIndex(item => item.id === q.id) + 1}. {q.label}
-              <span className="text-sm text-gray-500 ml-2">({(form[q.id] || "").length}/{q.charLimit})</span>
+              <span className="text-sm text-gray-500 ml-2 dark:text-gray-400">({(form[q.id] || "").length}/{q.charLimit})</span> {/* Dark mode for character count */}
             </label>
             <textarea
               id={q.id}
               value={form[q.id]}
               onChange={(e) => handleChange(q.id, e.target.value)}
               rows={Math.max(5, Math.ceil(q.charLimit / 150))} // Dynamic rows based on char limit for better UX
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 custom-textarea"
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm p-2 custom-textarea dark:bg-darkgray-800 dark:border-gray-600 dark:text-white" // Dark mode for textarea
               placeholder="Type your response here..."
               maxLength={q.charLimit} // Enforce max length at input level
             />
@@ -162,7 +162,7 @@ const SopQuestionnaire = () => {
       </div>
 
       <div className="mt-8 text-right">
-        <button onClick={handleSave} className="bg-primary hover:bg-yellow-500 text-white px-6 py-2 rounded shadow">
+        <button onClick={handleSave} className="bg-primary hover:bg-yellow-500 text-white px-6 py-2 rounded shadow dark:bg-primary-dark dark:hover:bg-yellow-600"> {/* Dark mode for button */}
           Save Responses
         </button>
       </div>

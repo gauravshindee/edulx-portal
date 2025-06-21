@@ -1,11 +1,10 @@
 // src/views/student/TotalExpense.tsx
-// This file is already well-structured and doesn't need further changes for the dashboard card feature.
 
 import React, { useState, useEffect } from 'react';
 import { Button, Modal, Form, Input, Select, DatePicker, message, Card, Statistic, Table, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { collection, addDoc, updateDoc, deleteDoc, doc, query, onSnapshot, Timestamp } from 'firebase/firestore'; // Removed getDocs, where as they are not used directly in this snippet after onSnapshot
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db, auth } from 'src/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
@@ -90,7 +89,9 @@ const TotalExpense: React.FC = () => {
         const expensesData: Expense[] = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
+          // Ensure amount is parsed as number, default to 0 if not valid
           amount: Number(doc.data().amount) || 0,
+          // Convert Firestore Timestamp to YYYY-MM-DD string
           date: doc.data().date instanceof Timestamp ? dayjs(doc.data().date.toDate()).format('YYYY-MM-DD') : doc.data().date,
         })) as Expense[];
         setExpenses(expensesData);
@@ -113,7 +114,7 @@ const TotalExpense: React.FC = () => {
       setEditingExpense(expense);
       form.setFieldsValue({
         ...expense,
-        date: dayjs(expense.date),
+        date: dayjs(expense.date), // Convert date string back to Dayjs object for DatePicker
       });
       setSelectedExpenseType(expense.expenseType);
       if (expense.expenseType === "EduLX Package") {
@@ -126,8 +127,8 @@ const TotalExpense: React.FC = () => {
       form.resetFields();
       setSelectedExpenseType(null);
       setSelectedPackageType(null);
-      form.setFieldValue('date', dayjs());
-      form.setFieldValue('amount', null);
+      form.setFieldValue('date', dayjs()); // Set default date to today for new expense
+      form.setFieldValue('amount', null); // Clear amount for new expense
     }
     setIsModalVisible(true);
   };
@@ -142,9 +143,9 @@ const TotalExpense: React.FC = () => {
 
   const handleExpenseTypeChange = (value: string) => {
     setSelectedExpenseType(value);
-    setSelectedPackageType(null);
+    setSelectedPackageType(null); // Reset package type when expense type changes
     if (value !== "EduLX Package") {
-      form.setFieldsValue({ packageType: undefined, amount: null, description: undefined });
+      form.setFieldsValue({ packageType: undefined, amount: null, description: undefined, installmentNumber: undefined });
     }
   };
 
@@ -155,7 +156,8 @@ const TotalExpense: React.FC = () => {
       const installmentAmount = Math.ceil(packageInfo.price / packageInfo.installments);
       form.setFieldsValue({
         amount: installmentAmount,
-        description: `${value} Package - Installment (1 of ${packageInfo.installments})`,
+        description: `${value} Package - Installment (1 of ${packageInfo.installments})`, // Pre-fill description
+        installmentNumber: 1, // Default to first installment
       });
     }
   };
@@ -178,10 +180,10 @@ const TotalExpense: React.FC = () => {
       expenseType: values.expenseType,
       description: values.description,
       amount: parsedAmount,
-      date: values.date.format('YYYY-MM-DD'),
-      ...(values.expenseType === "EduLX Package" && {
+      date: values.date.format('YYYY-MM-DD'), // Save date as YYYY-MM-DD string
+      ...(values.expenseType === "EduLX Package" && { // Conditionally add package details
         packageType: values.packageType,
-        installmentNumber: values.installmentNumber || 1,
+        installmentNumber: values.installmentNumber || 1, // Default to 1 if not set
       }),
     };
 
@@ -226,7 +228,7 @@ const TotalExpense: React.FC = () => {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
-      render: (text: string) => dayjs(text).format('MMM D, YYYY'),
+      render: (text: string) => dayjs(text).format('MMM D, YYYY'), // Corrected format
       sorter: (a: Expense, b: Expense) => dayjs(a.date).unix() - dayjs(b.date).unix(),
     },
     {
@@ -234,6 +236,8 @@ const TotalExpense: React.FC = () => {
       dataIndex: 'expenseType',
       key: 'expenseType',
       sorter: (a: Expense, b: Expense) => a.expenseType.localeCompare(b.expenseType),
+      // Added responsive design for expense type
+      responsive: ['md'],
     },
     {
       title: 'Description',
@@ -275,13 +279,13 @@ const TotalExpense: React.FC = () => {
         </div>
       ),
       align: 'center' as 'center',
-      width: 150,
+      width: 150, // Fixed width for actions column
     },
   ];
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center min-h-[50vh] flex flex-col justify-center items-center">
+      <div className="container mx-auto px-4 py-8 text-center min-h-[50vh] flex flex-col justify-center items-center bg-white dark:bg-darkgray rounded-lg shadow-md">
         <h2 className="text-2xl font-bold mb-4 text-dark dark:text-white">Total Expenditure Tracker</h2>
         <p className="text-lg text-gray-600 dark:text-gray-300">
           Please log in to track your expenses.
@@ -296,7 +300,7 @@ const TotalExpense: React.FC = () => {
         Total Expenditure Tracker
       </h2>
 
-      <Card className="mb-6 bg-white dark:bg-darkgray shadow-md rounded-lg">
+      <Card className="mb-6 bg-white dark:bg-darkgray shadow-md rounded-lg dark:border-gray-700">
         <Statistic
           title={<span className="text-dark dark:text-white">Total Expenditure</span>}
           value={totalExpenditure}
@@ -311,14 +315,14 @@ const TotalExpense: React.FC = () => {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => showModal()}
-          className="bg-primary text-white hover:bg-yellow-500 transition-colors"
-          style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
+          className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:bg-primary-dark dark:hover:bg-yellow-600 dark:border-primary-dark"
+          style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }} // Kept for consistency if primary is not FBCC32
         >
           Add New Expense
         </Button>
       </div>
 
-      <Card className="bg-white dark:bg-darkgray shadow-md rounded-lg">
+      <Card className="bg-white dark:bg-darkgray shadow-md rounded-lg dark:border-gray-700">
         <Table
           dataSource={expenses}
           columns={columns}
@@ -327,6 +331,23 @@ const TotalExpense: React.FC = () => {
           pagination={{ pageSize: 10 }}
           className="expense-table"
           scroll={{ x: 'max-content' }}
+          // Added dark mode styling for the table itself
+          rowClassName="dark:bg-darkgray-700 dark:text-white"
+          // Custom header for dark mode
+          components={{
+            header: {
+              wrapper: (props: any) => (
+                <thead {...props} className="dark:bg-darkgray-800">
+                  {props.children}
+                </thead>
+              ),
+              cell: (props: any) => (
+                <th {...props} className={`${props.className} dark:bg-darkgray-800 dark:text-gray-200 dark:border-gray-600`}>
+                  {props.children}
+                </th>
+              ),
+            },
+          }}
         />
       </Card>
 
@@ -337,26 +358,66 @@ const TotalExpense: React.FC = () => {
         footer={null}
         centered
         width={600}
-        destroyOnHidden={true}
+        // Moved comment to resolve TS1005 error
+        destroyOnClose={true}
+        // Custom styles for modal content in dark mode
+        styles={{
+          content: {
+            backgroundColor: 'var(--darkgray)', // Assuming --darkgray is defined in your CSS vars
+            color: 'white',
+          },
+          header: {
+            backgroundColor: 'var(--darkgray)',
+            borderBottom: '1px solid var(--gray-700)',
+          },
+          body: {
+            backgroundColor: 'var(--darkgray)',
+            color: 'white',
+          },
+        }}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleFormSubmit}
           initialValues={{ date: dayjs() }}
+          className="dark:text-white" // Apply dark text to form labels
         >
           <Form.Item
             name="expenseType"
-            label="Expense Type"
+            label={<span className="dark:text-white">Expense Type</span>}
             rules={[{ required: true, message: 'Please select an expense type!' }]}
           >
             <Select
               placeholder="Select Expense Type"
               onChange={handleExpenseTypeChange}
               className="select-md"
+              dropdownStyle={{ backgroundColor: 'var(--darkgray-700)' }} // Dark mode for dropdown
+              optionFilterProp="children"
+              optionLabelProp="children"
+              popupClassName="dark-select-dropdown" // Custom class for dark mode dropdown options
+              // Custom styles for Ant Design Select in dark mode
+              styles={{
+                selector: {
+                  backgroundColor: 'var(--darkgray-800)',
+                  border: '1px solid var(--gray-600)',
+                  color: 'white',
+                },
+                input: {
+                  color: 'white',
+                },
+                singleValue: {
+                  color: 'white',
+                },
+                placeholder: {
+                  color: 'var(--gray-400)',
+                }
+              }}
             >
               {EXPENSE_CATEGORIES.map(category => (
-                <Option key={category} value={category}>{category}</Option>
+                <Option key={category} value={category} className="dark:bg-darkgray-700 dark:text-white">
+                  {category}
+                </Option>
               ))}
             </Select>
           </Form.Item>
@@ -364,31 +425,55 @@ const TotalExpense: React.FC = () => {
           {selectedExpenseType === "EduLX Package" && (
             <Form.Item
               name="packageType"
-              label="Select Package"
+              label={<span className="dark:text-white">Select Package</span>}
               rules={[{ required: true, message: 'Please select a package!' }]}
             >
               <Select
                 placeholder="Select EduLX Package"
                 onChange={handlePackageTypeChange}
                 className="select-md"
+                dropdownStyle={{ backgroundColor: 'var(--darkgray-700)' }}
+                optionFilterProp="children"
+                optionLabelProp="children"
+                popupClassName="dark-select-dropdown"
+                styles={{
+                  selector: {
+                    backgroundColor: 'var(--darkgray-800)',
+                    border: '1px solid var(--gray-600)',
+                    color: 'white',
+                  },
+                  input: {
+                    color: 'white',
+                  },
+                  singleValue: {
+                    color: 'white',
+                  },
+                  placeholder: {
+                    color: 'var(--gray-400)',
+                  }
+                }}
               >
-                <Option value="Pro">Pro (₹69,999)</Option>
-                <Option value="Premium">Premium (₹1,29,999)</Option>
+                <Option value="Pro" className="dark:bg-darkgray-700 dark:text-white">Pro (₹69,999)</Option>
+                <Option value="Premium" className="dark:bg-darkgray-700 dark:text-white">Premium (₹1,29,999)</Option>
               </Select>
             </Form.Item>
           )}
 
           <Form.Item
             name="description"
-            label="Description"
+            label={<span className="dark:text-white">Description</span>}
             rules={[{ required: true, message: 'Please enter a description!' }]}
           >
-            <Input.TextArea rows={2} placeholder="e.g., Application for UofT, Visa appointment, Flight to Toronto" />
+            <Input.TextArea
+              rows={2}
+              placeholder="e.g., Application for UofT, Visa appointment, Flight to Toronto"
+              className="dark:bg-darkgray-800 dark:border-gray-600 dark:text-white"
+            />
           </Form.Item>
 
           <Form.Item
             name="amount"
-            label="Amount (₹)"
+            label={<span className="dark:text-white">Amount (₹)</span>}
             rules={[
               { required: true, message: 'Please enter the amount!' },
               {
@@ -405,26 +490,37 @@ const TotalExpense: React.FC = () => {
               },
             ]}
           >
-            <Input type="number" placeholder="e.g., 10000" />
+            <Input
+              type="number"
+              placeholder="e.g., 10000"
+              className="dark:bg-darkgray-800 dark:border-gray-600 dark:text-white"
+            />
           </Form.Item>
 
           <Form.Item
             name="date"
-            label="Date"
+            label={<span className="dark:text-white">Date</span>}
             rules={[{ required: true, message: 'Please select the date!' }]}
           >
-            <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+            <DatePicker
+              style={{ width: '100%' }}
+              format="YYYY-MM-DD"
+              className="dark:bg-darkgray-800 dark:border-gray-600 dark:text-white"
+              // Ensure the panel itself respects dark mode, usually handled by Ant Design's theme or global styles
+              // but can be forced if necessary
+              // pickerClassName="dark:bg-darkgray-700" // This might not work directly, might need a custom popupStyle
+            />
           </Form.Item>
 
           <Form.Item className="mt-4 flex justify-end">
-            <Button onClick={handleCancel} className="mr-2 dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600">
+            <Button onClick={handleCancel} className="mr-2 dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600 dark:border-gray-600">
               Cancel
             </Button>
             <Button
               type="primary"
               htmlType="submit"
               icon={<PlusOutlined />}
-              className="bg-primary text-white hover:bg-yellow-500 transition-colors"
+              className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:bg-primary-dark dark:hover:bg-yellow-600 dark:border-primary-dark"
               style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
             >
               {editingExpense ? "Update Expense" : "Add Expense"}

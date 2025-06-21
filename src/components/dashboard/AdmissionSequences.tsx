@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Select } from "flowbite-react";
 import { Icon } from "@iconify/react";
 import Chart from "react-apexcharts";
@@ -182,7 +182,7 @@ const AdmissionSequences = () => {
           position: 'top',
           enabled: true,
           offsetY: -10, // Adjust vertical position
-          formatter: function (val, opts) {
+          formatter: function (val: string | number, opts: any) { // Explicitly type val and opts
             // Display the shortened label for each bar from docDisplayLabels
             return docDisplayLabels[opts.dataPointIndex];
           },
@@ -202,6 +202,7 @@ const AdmissionSequences = () => {
     },
     dataLabels: {
       enabled: false, // Overall dataLabels is false, specific bar dataLabels are true
+      // No 'total' property with 'enabled' here as per ApexCharts types
     },
     stroke: { show: false },
     xaxis: {
@@ -223,16 +224,16 @@ const AdmissionSequences = () => {
     tooltip: {
       enabled: true,
       y: {
-        formatter: function (val: number, { dataPointIndex }) {
-          const color = docColors[dataPointIndex];
+        formatter: function (_val: number, opts: any) { // Renamed val to _val as it's not used, typed opts as any
+          const color = docColors[opts.dataPointIndex];
           return color === 'var(--color-primary)' ? "Submitted" : "Pending";
         },
         title: {
-            formatter: (seriesName) => '' // Hide series name
+            formatter: (_seriesName) => '' // Hide series name, renamed seriesName to _seriesName
         }
       },
       x: {
-        formatter: function (val: string) {
+        formatter: function (val: string) { // val can be string here for x-axis categories
           // This will show the full document name on hover
           return val;
         }

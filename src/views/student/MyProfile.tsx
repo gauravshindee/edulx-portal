@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  doc, getDoc, setDoc, updateDoc
+  doc, getDoc, setDoc, updateDoc, Timestamp // Import Timestamp
 } from "firebase/firestore";
 import {
   ref as storageRef, uploadBytesResumable, getDownloadURL
@@ -18,8 +18,37 @@ import { Progress } from 'antd'; // Ant Design Progress
 
 const animatedComponents = makeAnimated();
 
+// Define a type for your form state for better type safety
+interface MyProfileForm {
+  fullName: string;
+  dob: Date | null;
+  placeOfBirth: string;
+  address: string;
+  phone: string;
+  schoolName: string;
+  schoolStart: Date | null;
+  schoolEnd: Date | null;
+  universityName: string;
+  uniStart: Date | null;
+  uniEnd: Date | null;
+  fieldOfStudy: string;
+  internshipRole: string;
+  internshipArea: string;
+  internshipStart: Date | null;
+  internshipEnd: Date | null;
+  intake: string;
+  preferredCountries: string[];
+  languages: string;
+  tenthGrades: string;
+  twelfthGrades: string;
+  bachelorGrades: string;
+  ieltsScore: string;
+  otherLanguageGrades: string;
+  desiredCourse: string;
+}
+
 // Export initialForm so it can be used by other components/hooks (e.g., useProfileCompletion)
-export const initialForm = {
+export const initialForm: MyProfileForm = {
   fullName: "",
   dob: null,
   placeOfBirth: "",
@@ -49,15 +78,16 @@ export const initialForm = {
 
 const MyProfile = () => {
     const { user } = useAuth();
-    const [form, setForm] = useState(initialForm);
+    const [form, setForm] = useState<MyProfileForm>(initialForm);
     const [profileImage, setProfileImage] = useState("");
     const [uploadingImage, setUploadingImage] = useState(false);
     const [status, setStatus] = useState("");
     const [isExisting, setIsExisting] = useState(false);
     const [imageUploadProgress, setImageUploadProgress] = useState(0);
 
-    // Using useCallback for loadProfile and loadProfileImage to prevent unnecessary re-creations
-    // which can lead to infinite loops in useEffect if not handled carefully.
+    // loadProfile and loadProfileImage are stable functions and don't need useCallback
+    // as their dependencies (`user`, `db`, `storage`) are either from context (stable reference)
+    // or imported modules (stable). They are correctly placed in useEffect's dependency array.
     const loadProfile = async () => {
       if (!user || !user.uid) return;
 
@@ -68,18 +98,21 @@ const MyProfile = () => {
           const data = snap.data();
 
           // Convert Firebase Timestamps back to Date objects for DatePicker
-          const convertedData = {
+          const convertedData: MyProfileForm = {
+            ...initialForm, // Ensure all fields from initialForm are present
             ...data,
-            dob: data.dob ? data.dob.toDate() : null,
-            schoolStart: data.schoolStart ? data.schoolStart.toDate() : null,
-            schoolEnd: data.schoolEnd ? data.schoolEnd.toDate() : null,
-            uniStart: data.uniStart ? data.uniStart.toDate() : null,
-            uniEnd: data.uniEnd ? data.uniEnd.toDate() : null,
-            internshipStart: data.internshipStart ? data.internshipStart.toDate() : null,
-            internshipEnd: data.internshipEnd ? data.internshipEnd.toDate() : null,
+            dob: data.dob instanceof Timestamp ? data.dob.toDate() : null,
+            schoolStart: data.schoolStart instanceof Timestamp ? data.schoolStart.toDate() : null,
+            schoolEnd: data.schoolEnd instanceof Timestamp ? data.schoolEnd.toDate() : null,
+            uniStart: data.uniStart instanceof Timestamp ? data.uniStart.toDate() : null,
+            uniEnd: data.uniEnd instanceof Timestamp ? data.uniEnd.toDate() : null,
+            internshipStart: data.internshipStart instanceof Timestamp ? data.internshipStart.toDate() : null,
+            internshipEnd: data.internshipEnd instanceof Timestamp ? data.internshipEnd.toDate() : null,
+            // Ensure preferredCountries is an array of strings
+            preferredCountries: Array.isArray(data.preferredCountries) ? data.preferredCountries : [],
           };
 
-          setForm({ ...initialForm, ...convertedData }); // Merge with initialForm to ensure all fields are present
+          setForm(convertedData);
           setIsExisting(true);
         } else {
             setForm(initialForm); // If no profile, reset to initial empty form
@@ -98,7 +131,7 @@ const MyProfile = () => {
         const imgRef = storageRef(storage, `students/${user.uid}/profile.jpg`);
         const url = await getDownloadURL(imgRef);
         setProfileImage(url);
-      } catch (err) {
+      } catch (err: any) { // Catching as any for broader compatibility with Firebase error types
         console.log(`No profile image found for user ${user.uid} or other load error:`, err.code);
         setProfileImage(""); // Clear image if not found or error
       }
@@ -153,7 +186,7 @@ const MyProfile = () => {
       }
     };
 
-    const handleChange = (field: keyof typeof initialForm, value: any) => {
+    const handleChange = (field: keyof MyProfileForm, value: any) => {
       setForm((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -171,12 +204,13 @@ const MyProfile = () => {
       try {
         const ref = doc(db, "users", user.uid, "profile", "info");
         // Firebase Timestamp conversion for Date objects before saving
-        const formToSave = { ...form };
+        const formToSave: Record<string, any> = { ...form }; // Use Record<string, any> for dynamic keys
+
         for (const key in formToSave) {
             if (formToSave[key] instanceof Date) {
                 // Check if the Date object is valid before converting to timestamp
                 if (!isNaN(formToSave[key].getTime())) {
-                    formToSave[key] = new Date(formToSave[key]); // Ensure it's a valid Date object if it came from DatePicker
+                    formToSave[key] = Timestamp.fromDate(formToSave[key]); // Convert to Firebase Timestamp
                 } else {
                     formToSave[key] = null; // Set to null if invalid date
                 }
@@ -196,9 +230,9 @@ const MyProfile = () => {
 
     const filledFields = Object.entries(form).filter(([key, value]) => {
       // Exclude the profileImage related fields and other auxiliary states from completion calculation
-      if (key === 'profileImage' || key === 'uploadingImage' || key === 'status' || key === 'isExisting' || key === 'imageUploadProgress') {
-        return false;
-      }
+      // Note: `keyof typeof initialForm` ensures that `key` is a valid form field name.
+      // Auxiliary states like 'profileImage', 'uploadingImage', etc., are not part of initialForm,
+      // so they naturally won't be considered here.
       if (value === null || value === undefined) {
         return false;
       }
@@ -211,6 +245,7 @@ const MyProfile = () => {
       if (value instanceof Date) {
         return !isNaN(value.getTime());
       }
+      // For any other type (number, boolean, etc.), check if it has a truthy value
       return !!value;
     }).length;
 
@@ -219,12 +254,12 @@ const MyProfile = () => {
 
 
     return (
-      <div className="p-6 max-w-7xl mx-auto relative">
+      <div className="p-6 max-w-7xl mx-auto relative bg-white dark:bg-darkgray rounded-xl shadow-md">
         {/* Adjusted flex behavior: keep full width on smaller screens, allow wrapping on larger */}
         <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-4">
             {/* The main profile heading and progress bar */}
             <div className="mb-4 md:mb-0 md:flex-1"> {/* Added md:flex-1 to ensure it takes space */}
-                <h2 className="text-2xl font-bold mb-2">🎓 My Profile</h2>
+                <h2 className="text-2xl font-bold mb-2 text-dark dark:text-white">🎓 My Profile</h2>
                 <Progress
                   percent={profileCompletionProgress}
                   status={profileCompletionProgress === 100 ? 'success' : 'active'}
@@ -234,7 +269,7 @@ const MyProfile = () => {
                     to: '#FBCC32',
                   }}
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 mt-1 dark:text-gray-400">
                   ({missingFields} Fields Still Missing)
                 </p>
             </div>
@@ -243,9 +278,9 @@ const MyProfile = () => {
                 and float to the right on medium/large screens. */}
             <div className="flex flex-col items-center md:items-end md:ml-4"> {/* Added md:ml-4 for spacing */}
                 {profileImage ? (
-                    <img src={profileImage} alt="Profile" className="w-24 h-24 object-cover rounded-full border-2 border-gray-300 shadow-md mb-2" />
+                    <img src={profileImage} alt="Profile" className="w-24 h-24 object-cover rounded-full border-2 border-gray-300 shadow-md mb-2 dark:border-gray-600" />
                 ) : (
-                    <div className="w-24 h-24 flex items-center justify-center bg-gray-200 text-gray-500 rounded-full border-2 border-gray-300 shadow-md mb-2 text-center text-xs p-2">
+                    <div className="w-24 h-24 flex items-center justify-center bg-gray-200 text-gray-500 rounded-full border-2 border-gray-300 shadow-md mb-2 text-center text-xs p-2 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600">
                         No image uploaded
                     </div>
                 )}
@@ -253,7 +288,7 @@ const MyProfile = () => {
                     type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
-                    className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-yellow-500 cursor-pointer"
+                    className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-yellow-500 cursor-pointer dark:file:bg-primary-dark dark:hover:file:bg-yellow-600 dark:text-gray-300"
                 />
                 {uploadingImage && (
                     <Progress
@@ -271,48 +306,78 @@ const MyProfile = () => {
             </div>
         </div>
 
-        {status && <p className="mt-4 text-sm text-blue-600">{status}</p>}
+        {status && <p className="mt-4 text-sm text-blue-600 dark:text-blue-400">{status}</p>}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {/* Form fields */}
-          <input className="input" placeholder="Full Name" value={form.fullName} onChange={(e) => handleChange("fullName", e.target.value)} />
+          <input className="input-field" placeholder="Full Name" value={form.fullName} onChange={(e) => handleChange("fullName", e.target.value)} />
           <div className="flex gap-2">
-            <DatePicker selected={form.dob} onChange={(d) => handleChange("dob", d)} placeholderText="Date of Birth" className="input" />
-            <input className="input flex-1" placeholder="Place of Birth" value={form.placeOfBirth} onChange={(e) => handleChange("placeOfBirth", e.target.value)} />
+            <DatePicker selected={form.dob} onChange={(d) => handleChange("dob", d)} placeholderText="Date of Birth" className="input-field" />
+            <input className="input-field flex-1" placeholder="Place of Birth" value={form.placeOfBirth} onChange={(e) => handleChange("placeOfBirth", e.target.value)} />
           </div>
-          <input className="input" placeholder="Address in India" value={form.address} onChange={(e) => handleChange("address", e.target.value)} />
-          <input className="input" placeholder="Phone Number" value={form.phone} onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} />
-          <input className="input" placeholder="School Name" value={form.schoolName} onChange={(e) => handleChange("schoolName", e.target.value)} />
+          <input className="input-field" placeholder="Address in India" value={form.address} onChange={(e) => handleChange("address", e.target.value)} />
+          <input className="input-field" placeholder="Phone Number" value={form.phone} onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} />
+          <input className="input-field" placeholder="School Name" value={form.schoolName} onChange={(e) => handleChange("schoolName", e.target.value)} />
           <div className="flex gap-2">
-            <DatePicker selected={form.schoolStart} onChange={(d) => handleChange("schoolStart", d)} placeholderText="Start" className="input" />
-            <DatePicker selected={form.schoolEnd} onChange={(d) => handleChange("schoolEnd", d)} placeholderText="End" className="input" />
+            <DatePicker selected={form.schoolStart} onChange={(d) => handleChange("schoolStart", d)} placeholderText="Start" className="input-field" />
+            <DatePicker selected={form.schoolEnd} onChange={(d) => handleChange("schoolEnd", d)} placeholderText="End" className="input-field" />
           </div>
-          <input className="input" placeholder="University Name" value={form.universityName} onChange={(e) => handleChange("universityName", e.target.value)} />
+          <input className="input-field" placeholder="University Name" value={form.universityName} onChange={(e) => handleChange("universityName", e.target.value)} />
           <div className="flex gap-2">
-            <DatePicker selected={form.uniStart} onChange={(d) => handleChange("uniStart", d)} placeholderText="Start" className="input" />
-            <DatePicker selected={form.uniEnd} onChange={(d) => handleChange("uniEnd", d)} placeholderText="End" className="input" />
+            <DatePicker selected={form.uniStart} onChange={(d) => handleChange("uniStart", d)} placeholderText="Start" className="input-field" />
+            <DatePicker selected={form.uniEnd} onChange={(d) => handleChange("uniEnd", d)} placeholderText="End" className="input-field" />
           </div>
           {/* Using a union type for onChange, as value can be {value, label} for single selects or array for multi */}
-          <Select options={COURSES} placeholder="Field of Study (Bachelor)" onChange={(e: any) => handleChange("fieldOfStudy", e?.value)} value={COURSES.find(opt => opt.value === form.fieldOfStudy)} className="text-sm" />
-          <input className="input" placeholder="Internship Role" value={form.internshipRole} onChange={(e) => handleChange("internshipRole", e.target.value)} />
-          <input className="input" placeholder="Internship Area" value={form.internshipArea} onChange={(e) => handleChange("internshipArea", e.target.value)} />
+          <Select
+            options={COURSES}
+            placeholder="Field of Study (Bachelor)"
+            onChange={(e: any) => handleChange("fieldOfStudy", e?.value)}
+            value={COURSES.find(opt => opt.value === form.fieldOfStudy)}
+            className="text-sm react-select-container"
+            classNamePrefix="react-select"
+          />
+          <input className="input-field" placeholder="Internship Role" value={form.internshipRole} onChange={(e) => handleChange("internshipRole", e.target.value)} />
+          <input className="input-field" placeholder="Internship Area" value={form.internshipArea} onChange={(e) => handleChange("internshipArea", e.target.value)} />
           <div className="flex gap-2">
-            <DatePicker selected={form.internshipStart} onChange={(d) => handleChange("internshipStart", d)} placeholderText="Start" className="input" />
-            <DatePicker selected={form.internshipEnd} onChange={(d) => handleChange("internshipEnd", d)} placeholderText="End" className="input" />
+            <DatePicker selected={form.internshipStart} onChange={(d) => handleChange("internshipStart", d)} placeholderText="Start" className="input-field" />
+            <DatePicker selected={form.internshipEnd} onChange={(d) => handleChange("internshipEnd", d)} placeholderText="End" className="input-field" />
           </div>
-          <Select options={[{ value: "Summer", label: "Summer" }, { value: "Winter", label: "Winter" }]} placeholder="Intake" onChange={(e: any) => handleChange("intake", e?.value)} value={{ value: form.intake, label: form.intake }} />
-          <Select components={animatedComponents} isMulti options={COUNTRIES} placeholder="Preferred Countries" onChange={(opts) => handleChange("preferredCountries", opts.map(o => o.value))} value={COUNTRIES.filter(c => form.preferredCountries.includes(c.value))} />
-          <input className="input" placeholder="Languages Spoken" value={form.languages} onChange={(e) => handleChange("languages", e.target.value)} />
-          <input className="input" placeholder="10th Grades" value={form.tenthGrades} onChange={(e) => handleChange("tenthGrades", e.target.value)} />
-          <input className="input" placeholder="12th Grades" value={form.twelfthGrades} onChange={(e) => handleChange("twelfthGrades", e.target.value)} />
-          <input className="input" placeholder="Bachelor Grades" value={form.bachelorGrades} onChange={(e) => handleChange("bachelorGrades", e.target.value)} />
-          <input className="input" placeholder="IELTS Score" value={form.ieltsScore} onChange={(e) => handleChange("ieltsScore", e.target.value)} />
-          <input className="input" placeholder="Other Languages & Grades" value={form.otherLanguageGrades} onChange={(e) => handleChange("otherLanguageGrades", e.target.value)} />
-          <Select options={COURSES} placeholder="Desired Course Abroad" onChange={(e: any) => handleChange("desiredCourse", e?.value)} value={COURSES.find(opt => opt.value === form.desiredCourse)} />
+          <Select
+            options={[{ value: "Summer", label: "Summer" }, { value: "Winter", label: "Winter" }]}
+            placeholder="Intake"
+            onChange={(e: any) => handleChange("intake", e?.value)}
+            value={{ value: form.intake, label: form.intake }}
+            className="text-sm react-select-container"
+            classNamePrefix="react-select"
+          />
+          <Select
+            components={animatedComponents}
+            isMulti
+            options={COUNTRIES}
+            placeholder="Preferred Countries"
+            onChange={(opts) => handleChange("preferredCountries", opts.map(o => o.value))}
+            value={COUNTRIES.filter(c => form.preferredCountries.includes(c.value))}
+            className="text-sm react-select-container"
+            classNamePrefix="react-select"
+          />
+          <input className="input-field" placeholder="Languages Spoken" value={form.languages} onChange={(e) => handleChange("languages", e.target.value)} />
+          <input className="input-field" placeholder="10th Grades" value={form.tenthGrades} onChange={(e) => handleChange("tenthGrades", e.target.value)} />
+          <input className="input-field" placeholder="12th Grades" value={form.twelfthGrades} onChange={(e) => handleChange("twelfthGrades", e.target.value)} />
+          <input className="input-field" placeholder="Bachelor Grades" value={form.bachelorGrades} onChange={(e) => handleChange("bachelorGrades", e.target.value)} />
+          <input className="input-field" placeholder="IELTS Score" value={form.ieltsScore} onChange={(e) => handleChange("ieltsScore", e.target.value)} />
+          <input className="input-field" placeholder="Other Languages & Grades" value={form.otherLanguageGrades} onChange={(e) => handleChange("otherLanguageGrades", e.target.value)} />
+          <Select
+            options={COURSES}
+            placeholder="Desired Course Abroad"
+            onChange={(e: any) => handleChange("desiredCourse", e?.value)}
+            value={COURSES.find(opt => opt.value === form.desiredCourse)}
+            className="text-sm react-select-container"
+            classNamePrefix="react-select"
+          />
         </div>
 
         <div className="mt-4 text-right">
-          <button onClick={handleSave} className="bg-primary hover:bg-yellow-500 text-white px-6 py-2 rounded shadow">
+          <button onClick={handleSave} className="bg-primary hover:bg-yellow-500 text-white px-6 py-2 rounded shadow dark:bg-primary-dark dark:hover:bg-yellow-600">
             {isExisting ? "Update" : "Save"} Profile
           </button>
         </div>

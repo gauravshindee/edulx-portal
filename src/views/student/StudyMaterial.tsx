@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; // Removed React as it's not strictly necessary with new JSX transform
 import { Card, Typography, List, Button, Modal, Spin, message, Row, Col } from 'antd';
 import { FolderOutlined, FilePdfOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -6,6 +6,7 @@ import { saveAs } from 'file-saver';
 
 // Configure pdfjs worker source
 // Ensure you have 'pdf.worker.min.js' copied to your public/pdf-worker/ folder.
+// Adjust the path if your application is served from a sub-directory, e.g., process.env.PUBLIC_URL + '/pdf-worker/pdf.worker.min.js'
 pdfjs.GlobalWorkerOptions.workerSrc = '/portal/pdf-worker/pdf.worker.min.js';
 
 const { Title, Text } = Typography;
@@ -53,7 +54,7 @@ const StudyMaterial: React.FC = () => {
   // Directly convert the hardcoded structure into the format needed for display
   const studyCategories: StudyMaterialCategory[] = Object.keys(STUDY_MATERIALS_STRUCTURE).map(categoryName => ({
     name: categoryName,
-    materials: (STUDY_MATERIALS_STRUCTURE as any)[categoryName],
+    materials: (STUDY_MATERIALS_STRUCTURE as Record<string, StudyMaterialItem[]>)[categoryName], // Added type assertion for clarity
   }));
 
   const handleCategoryClick = (categoryName: string) => {
@@ -97,14 +98,18 @@ const StudyMaterial: React.FC = () => {
     setPdfLoading(false);
   };
 
-  const onDocumentLoadError = (error: any) => {
+  const onDocumentLoadError = (error: Error) => { // More specific type for error
     console.error('Error loading PDF document:', error);
     message.error(`Failed to load PDF: ${error.message}. Please check console for details.`);
     setPdfLoading(false);
   };
 
   const changePage = (offset: number) => {
-    setPageNumber(prevPageNumber => (prevPageNumber || 1) + offset);
+    setPageNumber(prevPageNumber => {
+      const newPage = (prevPageNumber || 1) + offset;
+      if (numPages === null) return newPage; // If numPages not loaded yet, allow movement
+      return Math.min(Math.max(1, newPage), numPages); // Clamp page number
+    });
   };
 
   const previousPage = () => changePage(-1);
