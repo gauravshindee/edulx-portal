@@ -1,6 +1,6 @@
 // src/hooks/useAdmittedUniversities.ts
 import { useState, useEffect } from "react";
-import { collection, onSnapshot, query, where, DocumentData } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore"; // Removed DocumentData
 import { db, auth } from "src/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 
@@ -47,10 +47,10 @@ export const useAdmittedUniversities = () => {
       (snapshot) => {
         const admittedData: ApplicationData[] = snapshot.docs.map((doc) => {
           const rawData = doc.data(); // Get raw data before casting
-          console.log("Raw Firestore document data:", rawData); // <--- ADD THIS LOG
+          // console.log("Raw Firestore document data:", rawData); // <--- Kept commented for cleanliness
 
           const data = rawData as ApplicationData; // Cast to your interface
-          
+
           if (!data.university) {
             console.warn(`Application ${doc.id} is missing or has an empty 'university' field.`);
           }

@@ -1,0 +1,32 @@
+src/components/dashboard/AdmissionSequences.tsx done
+src/components/dashboard/DailyActivity.tsx done
+src/components/dashboard/NewCustomers.tsxdone
+src/components/dashboard/TotalExpenseOverview.tsx done
+2. Hooks:
+
+src/hooks/useAdmittedUniversities.ts
+src/hooks/useLoginActivity.ts
+src/hooks/useProfileCompletion.ts
+src/hooks/useTotalExpenses.ts
+3. Layouts:
+
+src/layouts/full/sidebar/Sidebar.tsx
+4. Auth Views:
+
+src/views/auth/register/Register.tsx
+5. Student Views:
+
+src/views/student/Applications.tsx
+src/views/student/DocumentUpload.tsx
+src/views/student/EdulxPayments.tsx
+src/views/student/MockTest.tsx
+src/views/student/MyProfile.tsx
+src/views/student/SopQuestionnaire.tsx
+src/views/student/StudyMaterial.tsx
+src/views/student/TotalExpense.tsx (You already provided this, and I've given you the updated version.)
+6. Mock Test Sub-Views:
+
+src/views/student/mock-test/ListeningSection.tsx
+src/views/student/mock-test/ReadingSection.tsx
+src/views/student/mock-test/SpeakingSection.tsx
+src/views/student/mock-test/WritingSection.tsx

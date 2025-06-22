@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from "react"; // Removed useEffect as it's not used
 import { Select } from "flowbite-react";
 import { Icon } from "@iconify/react";
 import Chart from "react-apexcharts";
@@ -22,7 +22,7 @@ const studyAbroadProcessTimeline: AdmissionStep[] = [
   { title: "Financial Documents", description: "Arrange and prepare bank statements, sponsorship letters.", status: "pending" },
   { title: "Decision & Acceptance", description: "Receive admission decisions and accept best offers.", status: "pending" },
   { title: "Visa Application", description: "Begin student visa application process.", status: "pending" },
-  { title: "Travel & Orientation", description: "Book flights, arrange accommodation, attend orientation.", status: "pending" },
+  { title: "Travel & Orientation", "description": "Book flights, arrange accommodation, attend orientation.", status: "pending" },
 ];
 
 // --- Document Types from src/views/student/DocumentUpload.tsx ---
@@ -150,7 +150,7 @@ const AdmissionSequences = () => {
       else if (docType === "Bachelors / Masters Course Modules") shortenedLabel = "Course Modules";
       else if (docType === "Grading System PDF") shortenedLabel = "Grading PDF";
       else if (docType === "Other Documents") shortenedLabel = "Other Docs";
-      
+
       displayLabels.push(shortenedLabel);
 
       // Determine status based on mockUploadedDocumentsStatus
@@ -179,11 +179,12 @@ const AdmissionSequences = () => {
         borderRadius: 4,
         distributed: true, // Crucial for applying colors array to individual bars
         dataLabels: { // Data labels directly on bars (for titles)
+          enabled: true, // This is correctly placed here for bar-specific dataLabels
           position: 'top',
-          enabled: true,
           offsetY: -10, // Adjust vertical position
-          formatter: function (val: string | number, opts: any) { // Explicitly type val and opts
+          formatter: function (_val: string | number, opts: any) { // Used _val to suppress unused variable warning
             // Display the shortened label for each bar from docDisplayLabels
+            // Use opts.dataPointIndex to get the correct label
             return docDisplayLabels[opts.dataPointIndex];
           },
           style: {
@@ -200,9 +201,9 @@ const AdmissionSequences = () => {
         }
       },
     },
+    // The main dataLabels property (not within plotOptions.bar)
     dataLabels: {
       enabled: false, // Overall dataLabels is false, specific bar dataLabels are true
-      // No 'total' property with 'enabled' here as per ApexCharts types
     },
     stroke: { show: false },
     xaxis: {
@@ -224,16 +225,20 @@ const AdmissionSequences = () => {
     tooltip: {
       enabled: true,
       y: {
-        formatter: function (_val: number, opts: any) { // Renamed val to _val as it's not used, typed opts as any
+        // Corrected type for `_val` to `number` as per ApexOptions, suppressed unused warning
+        formatter: function (_val: number, opts: any) {
           const color = docColors[opts.dataPointIndex];
           return color === 'var(--color-primary)' ? "Submitted" : "Pending";
         },
         title: {
-            formatter: (_seriesName) => '' // Hide series name, renamed seriesName to _seriesName
+            // Changed parameter name to _seriesName to mark as unused
+            formatter: (_seriesName: string) => '' // Hide series name
         }
       },
       x: {
-        formatter: function (val: string) { // val can be string here for x-axis categories
+        // Corrected type for `val` to `string` as x-axis categories are strings
+        // ApexCharts `XAxisFormatter` for tooltip.x.formatter can accept string for category type.
+        formatter: function (val: string): string {
           // This will show the full document name on hover
           return val;
         }
@@ -262,9 +267,6 @@ const AdmissionSequences = () => {
         // Corrected text colors for legend labels to match bar colors
         colors: ['var(--color-primary)', 'var(--color-primary-dark)']
       },
-      formatter: function(seriesName) {
-        return seriesName; // Keep the series name as is, colors are handled by labels.colors
-      }
     },
     grid: { show: false },
     states: {
@@ -288,17 +290,20 @@ const AdmissionSequences = () => {
     <div className="rounded-xl dark:shadow-dark-md shadow-md bg-white dark:bg-darkgray p-6 relative w-full break-words">
       {/* Document Submission Status Section */}
       <div className="flex justify-between items-center mb-4">
-        <h5 className="card-title">Document Submission Status</h5>
+        <h5 className="card-title text-dark dark:text-white">Document Submission Status</h5> {/* Added dark mode text color */}
         <Select
           id="docCategory"
-          className="select-md"
+          // Flowbite-React Select might need custom styling for dark mode
+          // Consider adding a custom class to target it, or using their theming
+          // Example: className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+          className="select-md dark:bg-darkgray-700 dark:border-gray-600 dark:text-white"
           value={selectedDocCategory}
           onChange={(e) => setSelectedDocCategory(e.target.value as DocumentCategoryKey)}
           required
         >
-          <option value="personal">Personal Documents</option>
-          <option value="academic">Academic Documents</option>
-          <option value="extracurricular">Extracurricular Documents</option>
+          <option value="personal" className="dark:bg-darkgray-700 dark:text-white">Personal Documents</option>
+          <option value="academic" className="dark:bg-darkgray-700 dark:text-white">Academic Documents</option>
+          <option value="extracurricular" className="dark:bg-darkgray-700 dark:text-white">Extracurricular Documents</option>
         </Select>
       </div>
 
@@ -315,21 +320,24 @@ const AdmissionSequences = () => {
           type="bar"
           height={180}
         />
-        <p className="text-xs text-gray-500 text-center mt-2">
+        <p className="text-xs text-gray-500 text-center mt-2 dark:text-gray-400">
             Submitted documents are in yellow, pending in dark, please submit in Document Upload section.
         </p>
       </div>
 
       {/* Admission Process Steps Section (Horizontal Timeline) */}
-      <h5 className="card-title mb-4">Admission Process Steps</h5>
+      <h5 className="card-title text-dark dark:text-white mb-4">Admission Process Steps</h5> {/* Added dark mode text color */}
       <div className="relative overflow-x-auto py-0 custom-scrollbar-horizontal -mx-6">
         {studyAbroadProcessTimeline.length > 0 ? (
           <div className="flex flex-row justify-start min-w-max h-[140px] px-6">
             {studyAbroadProcessTimeline.map((step, index) => (
               <div
                 key={index}
-                className={`flex-none w-64 p-4 pb-2 bg-gray-50 dark:bg-darkgray-700 flex flex-col items-start relative z-10
-                          ${index > 0 ? '-ml-px' : ''} `}
+                className={`flex-none w-64 p-4 pb-2 flex flex-col items-start relative z-10
+                          ${index > 0 ? '-ml-px' : ''}
+                          ${step.status === 'completed' ? 'bg-green-50 dark:bg-green-900' :
+                            step.status === 'in-progress' ? 'bg-yellow-50 dark:bg-yellow-900' :
+                            'bg-gray-50 dark:bg-gray-700'} `}
                 style={{
                     borderTopLeftRadius: index === 0 ? '0.5rem' : '0',
                     borderBottomLeftRadius: index === 0 ? '0.5rem' : '0',
@@ -344,9 +352,9 @@ const AdmissionSequences = () => {
               >
                 <div className="flex items-center mb-2">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center mr-2
-                                  ${step.status === 'completed' ? 'bg-green-200 text-green-700' :
-                                    step.status === 'in-progress' ? 'bg-yellow-200 text-yellow-700' :
-                                    'bg-gray-200 text-gray-500'}`}>
+                                  ${step.status === 'completed' ? 'bg-green-200 text-green-700 dark:bg-green-600 dark:text-white' :
+                                    step.status === 'in-progress' ? 'bg-yellow-200 text-yellow-700 dark:bg-yellow-600 dark:text-white' :
+                                    'bg-gray-200 text-gray-500 dark:bg-gray-600 dark:text-gray-200'}`}>
                     <Icon icon={step.status === 'completed' ? 'ic:round-check' : 'ic:round-circle'} height={16} />
                   </div>
                   <h6 className="text-dark dark:text-white font-semibold text-sm whitespace-nowrap">{step.title}</h6>
@@ -358,7 +366,7 @@ const AdmissionSequences = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-4 text-gray-500 px-6">
+          <div className="text-center py-4 text-gray-500 px-6 dark:text-gray-400">
             No admission process steps available.
           </div>
         )}

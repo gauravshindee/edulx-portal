@@ -1,6 +1,6 @@
 // src/hooks/useProfileCompletion.ts
 import { useState, useEffect, useCallback } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, Timestamp } from "firebase/firestore"; // Import Timestamp for explicit type checking
 import { db } from "src/firebase"; // Make sure src/firebase is correctly set up
 import { useAuth } from "src/context/AuthContext"; // Assuming your AuthContext path is correct
 
@@ -21,7 +21,7 @@ export const useProfileCompletion = () => {
   const calculateCompletion = useCallback((formData: typeof initialForm) => {
     const totalFields = Object.keys(initialForm).length;
 
-    const filledFields = Object.entries(formData).filter(([key, value]) => {
+    const filledFields = Object.entries(formData).filter(([_key, value]) => { // Fix: Add underscore to '_key'
       if (value === null || value === undefined) {
         return false;
       }
@@ -31,10 +31,16 @@ export const useProfileCompletion = () => {
       if (Array.isArray(value)) {
         return value.length > 0;
       }
-      if (value instanceof Date) {
+      // Fix: Add a type guard before instanceof Date
+      if (typeof value === 'object' && value instanceof Date) {
         return !isNaN(value.getTime());
       }
-      return !!value;
+      // If it's a Firebase Timestamp, check if it has a toDate() method and it's a valid date
+      if (typeof value === 'object' && (value as Timestamp)?.toDate instanceof Function) {
+        const date = (value as Timestamp).toDate();
+        return !isNaN(date.getTime());
+      }
+      return !!value; // For boolean, number (non-zero), etc.
     }).length;
 
     const percent = totalFields > 0 ? Math.round((filledFields / totalFields) * 100) : 0;
@@ -57,17 +63,20 @@ export const useProfileCompletion = () => {
       if (snap.exists()) {
         const data = snap.data();
 
+        // Convert Firestore Timestamps to Date objects for direct use
+        // Also ensure these fields exist before attempting .toDate()
         const convertedData = {
           ...data,
-          dob: data.dob ? data.dob.toDate() : null,
-          schoolStart: data.schoolStart ? data.schoolStart.toDate() : null,
-          schoolEnd: data.schoolEnd ? data.schoolEnd.toDate() : null,
-          uniStart: data.uniStart ? data.uniStart.toDate() : null,
-          uniEnd: data.uniEnd ? data.uniEnd.toDate() : null,
-          internshipStart: data.internshipStart ? data.internshipStart.toDate() : null,
-          internshipEnd: data.internshipEnd ? data.internshipEnd.toDate() : null,
+          dob: data.dob instanceof Timestamp ? data.dob.toDate() : data.dob || null,
+          schoolStart: data.schoolStart instanceof Timestamp ? data.schoolStart.toDate() : data.schoolStart || null,
+          schoolEnd: data.schoolEnd instanceof Timestamp ? data.schoolEnd.toDate() : data.schoolEnd || null,
+          uniStart: data.uniStart instanceof Timestamp ? data.uniStart.toDate() : data.uniStart || null,
+          uniEnd: data.uniEnd instanceof Timestamp ? data.uniEnd.toDate() : data.uniEnd || null,
+          internshipStart: data.internshipStart instanceof Timestamp ? data.internshipStart.toDate() : data.internshipStart || null,
+          internshipEnd: data.internshipEnd instanceof Timestamp ? data.internshipEnd.toDate() : data.internshipEnd || null,
         };
 
+        // Pass the converted data to calculateCompletion
         calculateCompletion({ ...initialForm, ...convertedData });
       } else {
         // No profile exists, treat as all fields empty (or initial state)
@@ -80,11 +89,11 @@ export const useProfileCompletion = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, calculateCompletion]);
+  }, [user, calculateCompletion]); // Depend on loadProfile to re-run when user changes
 
   useEffect(() => {
     loadProfile();
-  }, [loadProfile]); // Depend on loadProfile to re-run when user changes
+  }, [loadProfile]); // Depend on loadProfile to re-run when loadProfile changes (due to useCallback deps)
 
   return { ...profileCompletion, loading, error, refreshProfileCompletion: loadProfile };
 };

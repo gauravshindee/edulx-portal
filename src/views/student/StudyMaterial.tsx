@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'; // Removed React as it's not strictly necessary with new JSX transform
+// src/views/student/StudyMaterial.tsx
+
+import { useState, useEffect } from 'react';
 import { Card, Typography, List, Button, Modal, Spin, message, Row, Col } from 'antd';
 import { FolderOutlined, FilePdfOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -6,8 +8,8 @@ import { saveAs } from 'file-saver';
 
 // Configure pdfjs worker source
 // Ensure you have 'pdf.worker.min.js' copied to your public/pdf-worker/ folder.
-// Adjust the path if your application is served from a sub-directory, e.g., process.env.PUBLIC_URL + '/pdf-worker/pdf.worker.min.js'
-pdfjs.GlobalWorkerOptions.workerSrc = '/portal/pdf-worker/pdf.worker.min.js';
+// Using process.env.PUBLIC_URL makes the path relative to your app's base URL in production.
+pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ''}/pdf-worker/pdf.worker.min.js`;
 
 const { Title, Text } = Typography;
 
@@ -201,6 +203,7 @@ const StudyMaterial: React.FC = () => {
                 onLoadError={onDocumentLoadError}
                 className="border dark:border-gray-700 rounded-md shadow-md my-4"
               >
+                {/* Fixed width for Page component, ensuring it fits the modal better */}
                 <Page pageNumber={pageNumber} width={Math.min(window.innerWidth * 0.7, 800)} />
               </Document>
             </Spin>

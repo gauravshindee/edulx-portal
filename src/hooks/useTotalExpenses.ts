@@ -1,5 +1,5 @@
 // src/hooks/useTotalExpenses.ts
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react"; // Removed useCallback
 import { collection, onSnapshot, query, orderBy, Timestamp } from "firebase/firestore";
 import { db, auth } from "src/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -64,6 +64,7 @@ export const useTotalExpenses = () => {
             id: doc.id,
             ...data,
             amount: Number(data.amount) || 0,
+            // Ensure date is correctly converted from Firestore Timestamp or kept as string
             date: data.date instanceof Timestamp ? dayjs(data.date.toDate()).format('YYYY-MM-DD') : data.date,
           } as Expense;
         });
@@ -88,12 +89,8 @@ export const useTotalExpenses = () => {
           chartPoints.push({ x: date, y: cumulativeAmount });
         });
 
-        // Ensure at least 6 points for the graph if data is sparse
-        if (chartPoints.length < 6) {
-          // You could add dummy points or just return the existing less than 6 points
-          // For now, let's just use what we have if less than 6
-        }
-
+        // No change needed here, as the chart component handles filling with 0 if data is less than 6 points
+        // based on the logic: `lastSixPoints.length > 0 ? lastSixPoints : [0, 0, 0, 0, 0, 0]`
 
         setExpenseGrowthSeries(chartPoints);
         setLoading(false);

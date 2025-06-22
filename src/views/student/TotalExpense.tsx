@@ -228,7 +228,7 @@ const TotalExpense: React.FC = () => {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
-      render: (text: string) => dayjs(text).format('MMM D, YYYY'), // Corrected format
+      render: (text: string) => dayjs(text).format('MMM D, YYYY'), // Corrected format for space
       sorter: (a: Expense, b: Expense) => dayjs(a.date).unix() - dayjs(b.date).unix(),
     },
     {
@@ -305,7 +305,8 @@ const TotalExpense: React.FC = () => {
           title={<span className="text-dark dark:text-white">Total Expenditure</span>}
           value={totalExpenditure}
           precision={0}
-          valueStyle={{ color: '#FBCC32' }}
+          // Changed to use CSS variable for consistency, assuming --primary is defined
+          valueStyle={{ color: 'var(--primary)' }}
           formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`}
         />
       </Card>
@@ -316,7 +317,8 @@ const TotalExpense: React.FC = () => {
           icon={<PlusOutlined />}
           onClick={() => showModal()}
           className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:bg-primary-dark dark:hover:bg-yellow-600 dark:border-primary-dark"
-          style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }} // Kept for consistency if primary is not FBCC32
+          // Removed inline style as it's typically handled by Tailwind/Ant Design primary colors and dark mode classes
+          // style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
         >
           Add New Expense
         </Button>
@@ -358,7 +360,6 @@ const TotalExpense: React.FC = () => {
         footer={null}
         centered
         width={600}
-        // Moved comment to resolve TS1005 error
         destroyOnClose={true}
         // Custom styles for modal content in dark mode
         styles={{
@@ -521,7 +522,8 @@ const TotalExpense: React.FC = () => {
               htmlType="submit"
               icon={<PlusOutlined />}
               className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:bg-primary-dark dark:hover:bg-yellow-600 dark:border-primary-dark"
-              style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
+              // Removed inline style as it's typically handled by Tailwind/Ant Design primary colors and dark mode classes
+              // style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
             >
               {editingExpense ? "Update Expense" : "Add Expense"}
             </Button>

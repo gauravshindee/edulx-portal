@@ -10,13 +10,17 @@ import {
   ExclamationCircleOutlined // Added for the custom confirm icon
 } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
-import Papa from 'papaparse';
+import Papa from 'papaparse'; // PapaParse is correctly imported, just needs types
 import dayjs from 'dayjs';
 
 // Firebase Imports
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, onSnapshot } from 'firebase/firestore';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth } from 'src/firebase'; // Adjust path as per your firebase.ts location
+import { collection, addDoc, updateDoc, deleteDoc, doc, query, onSnapshot } from 'firebase/firestore'; // Removed getDocs, where
+import { onAuthStateChanged, User } from "firebase/auth";
+import { db, auth } from "src/firebase"; // Adjust path as per your firebase.ts location
+
+// Type definitions for PapaParse results (if @types/papaparse is installed)
+import type { ParseResult, ParseError } from 'papaparse';
+import type { UploadFile, RcFile } from 'antd/lib/upload/interface'; // For precise typing of Upload's beforeUpload
 
 // Define the interface for an Application (matches your previous definition)
 interface Application {
@@ -51,6 +55,10 @@ const Applications: React.FC = () => {
   const [isDeleteConfirmModalVisible, setIsDeleteConfirmModalVisible] = useState(false);
   const [appToDeleteId, setAppToDeleteId] = useState<string | null>(null);
 
+  // State and functions for the detail modal within ApplicationCard
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+
 
   // 1. Listen for Auth State Changes
   useEffect(() => {
@@ -83,7 +91,21 @@ const Applications: React.FC = () => {
       (snapshot) => {
         const applicationsData: Application[] = snapshot.docs.map((doc) => ({
           id: doc.id, // Use Firestore's generated ID
-          ...doc.data(),
+          // Ensure all fields are present or defaulted if not coming from Firestore
+          // This is a common pattern to avoid `undefined` for optional fields if the document doesn't have them
+          city: doc.data().city || '',
+          university: doc.data().university || '',
+          course: doc.data().course || '',
+          intake: doc.data().intake || '',
+          universityLink: doc.data().universityLink || '',
+          applicationDeadline: doc.data().applicationDeadline || '',
+          profileFit: doc.data().profileFit || 'Medium',
+          priority: doc.data().priority || 'Medium',
+          applicationStatus: doc.data().applicationStatus || 'Not Started',
+          result: doc.data().result || '',
+          applicationFees: Number(doc.data().applicationFees) || 0,
+          comments: doc.data().comments || '',
+          userId: doc.data().userId || user.uid, // Default to current user's UID
         })) as Application[];
         setApplications(applicationsData);
         setLoading(false);
@@ -115,6 +137,7 @@ const Applications: React.FC = () => {
     const applicationData = {
       ...values,
       userId: user.uid, // Ensure userId is correctly set
+      // Convert dayjs object back to YYYY-MM-DD string
       applicationDeadline: values.applicationDeadline
         ? dayjs(values.applicationDeadline).format('YYYY-MM-DD')
         : '',
@@ -199,13 +222,14 @@ const Applications: React.FC = () => {
 
 
   // 5. Handle File Upload (CSV/XLSX) and Save to Firestore
-  const handleFileUpload = async (file: File) => {
+  // Explicitly type the parameters and return type for beforeUpload
+  const handleFileUpload = async (file: RcFile): Promise<boolean | UploadFile<any>> => {
     if (!user) {
       message.error("Please log in to upload applications.");
-      return Promise.reject(false);
+      return Promise.reject(false); // Reject the upload if no user
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<boolean>((resolve, reject) => { // Promise resolves to boolean
       const reader = new FileReader();
       reader.onload = async (e) => { // Made async to await Firestore operations
         const data = e.target?.result;
@@ -213,10 +237,11 @@ const Applications: React.FC = () => {
 
         try {
           if (file.name.endsWith('.csv')) {
+            // @ts-ignore - Ignore if @types/papaparse is not installed
             Papa.parse(data as string, {
               header: true,
               skipEmptyLines: true,
-              complete: async (results) => { // Made complete callback async
+              complete: async (results: ParseResult<any>) => { // Explicitly type results
                 parsedData = results.data.map((row: any) => ({
                   userId: user.uid, // Assign userId for imported data
                   city: row.City || '',
@@ -244,11 +269,11 @@ const Applications: React.FC = () => {
                   }
                 }
                 message.success(`${addedCount} applications added from CSV!`);
-                resolve(true);
+                resolve(true); // Resolve with true for successful upload
               },
-              error: (err) => {
+              error: (err: ParseError) => { // Explicitly type err
                 message.error(`CSV parsing error: ${err.message}`);
-                reject(false);
+                reject(false); // Reject with false for failed upload
               }
             });
           } else if (file.name.endsWith('.xlsx')) {
@@ -284,24 +309,25 @@ const Applications: React.FC = () => {
               }
             }
             message.success(`${addedCount} applications added from XLSX!`);
-            resolve(true);
+            resolve(true); // Resolve with true for successful upload
           } else {
             message.error('Unsupported file type. Please upload a .csv or .xlsx file.');
-            reject(false);
+            reject(false); // Reject with false for unsupported file type
           }
         } catch (parseError) {
           console.error("Error processing uploaded file:", parseError);
           message.error('Error processing file. Please check its content.');
-          reject(false);
+          reject(false); // Reject with false for other parsing errors
         }
       };
-      reader.onerror = (error) => {
+      reader.onerror = (_error: ProgressEvent<FileReader>) => { // Used _error to suppress unused variable warning
         message.error('Error reading file.');
-        reject(false);
+        reject(false); // Reject with false for file reading errors
       };
       reader.readAsBinaryString(file);
     });
   };
+
 
   const showAddModal = () => {
     setEditingApplication(null);
@@ -338,10 +364,6 @@ const Applications: React.FC = () => {
     XLSX.writeFile(wb, "applications_template.xlsx");
     message.success('Sample XLSX template downloaded!');
   };
-
-  // State and functions for the detail modal within ApplicationCard
-  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
 
   const handleCloseDetailModal = () => {
     console.log("handleCloseDetailModal called from Applications component (main)"); // Added log
@@ -383,11 +405,11 @@ const Applications: React.FC = () => {
         <h5 className="text-lg font-semibold text-primary-dark dark:text-white truncate mb-1">
           {app.university}
         </h5>
-        <p className="text-bodytext text-sm mb-1 truncate">{app.course}</p>
-        <p className="text-xs text-gray-500 mb-2 truncate">{app.city}</p>
+        <p className="text-bodytext dark:text-gray-300 text-sm mb-1 truncate">{app.course}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 truncate">{app.city}</p>
 
         <div className="flex justify-between items-center text-sm font-medium mt-3">
-          <span className="text-bodytext">Deadline: {app.applicationDeadline || 'N/A'}</span>
+          <span className="text-bodytext dark:text-gray-300">Deadline: {app.applicationDeadline || 'N/A'}</span>
           <span className={`px-3 py-1 rounded-full text-white text-xs ${getStatusColor(app.applicationStatus)}`}>
             {app.applicationStatus}
           </span>
@@ -441,7 +463,7 @@ const Applications: React.FC = () => {
       <div className="container mx-auto px-4 py-8 text-center min-h-[50vh] flex flex-col justify-center items-center">
         <h2 className="text-2xl font-bold mb-4 text-dark dark:text-white">Application Tracking</h2>
         {/* Changed width to size as per Ant Design deprecation warning */}
-        <Progress type="circle" percent={100} size={80} status="active" />
+        <Progress type="circle" percent={100} size={80} status="active" className="dark:!text-white" /> {/* Added dark mode for text color if applicable */}
         <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">Loading your applications...</p>
       </div>
     );
@@ -459,7 +481,7 @@ const Applications: React.FC = () => {
               className="absolute top-0 left-0 h-full rounded-full"
               style={{
                 width: `${progressPercentage}%`,
-                background: 'linear-gradient(to right, #4A5568, #FBCC32)',
+                background: 'linear-gradient(to right, var(--color-primary), var(--color-warning))', // Using CSS variables
               }}
             ></div>
           </div>
@@ -477,8 +499,8 @@ const Applications: React.FC = () => {
           type="primary"
           icon={<PlusOutlined />}
           onClick={showAddModal}
-          className="bg-primary text-white hover:bg-yellow-500 transition-colors"
-          style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
+          className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:text-dark dark:bg-yellow-500 dark:hover:bg-yellow-600"
+          style={{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' }} // Using CSS variables
         >
           Add University
         </Button>
@@ -533,13 +555,18 @@ const Applications: React.FC = () => {
             {editingApplication ? "Edit Application" : "Add New University Application"}
           </span>
         }
-        open={isAddModalVisible}
+        open={isAddModalVisible} // Use 'open' instead of 'visible'
         onCancel={handleCancelAddEditModal}
         footer={null}
         width={700}
         centered
-        className="application-form-modal"
-        destroyOnHidden={true} // Applied the deprecation fix
+        className="application-form-modal dark:bg-darkgray dark:text-white"
+        destroyOnClose={true} // Use 'destroyOnClose'
+        styles={{
+          content: { backgroundColor: 'var(--color-darkgray)' }, // For Antd Modal content background
+          header: { backgroundColor: 'var(--color-darkgray)', borderBottom: '1px solid var(--color-gray-700)' },
+          body: { backgroundColor: 'var(--color-darkgray)' },
+        }}
       >
         <Form
           form={form}
@@ -564,65 +591,83 @@ const Applications: React.FC = () => {
           }}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Form.Item name="city" label="City" rules={[{ required: true, message: 'Please input the city!' }]}>
-              <Input className="form-control-input" placeholder="e.g., Toronto" />
+            <Form.Item name="city" label={<span className="dark:text-white">City</span>} rules={[{ required: true, message: 'Please input the city!' }]}>
+              <Input className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="e.g., Toronto" />
             </Form.Item>
-            <Form.Item name="university" label="University" rules={[{ required: true, message: 'Please input the university name!' }]}>
-              <Input className="form-control-input" placeholder="e.g., University of Toronto" />
+            <Form.Item name="university" label={<span className="dark:text-white">University</span>} rules={[{ required: true, message: 'Please input the university name!' }]}>
+              <Input className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="e.g., University of Toronto" />
             </Form.Item>
-            <Form.Item name="course" label="Course" rules={[{ required: true, message: 'Please input the course name!' }]}>
-              <Input className="form-control-input" placeholder="e.g., M.Eng. Computer Engineering" />
+            <Form.Item name="course" label={<span className="dark:text-white">Course</span>} rules={[{ required: true, message: 'Please input the course name!' }]}>
+              <Input className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="e.g., M.Eng. Computer Engineering" />
             </Form.Item>
-            <Form.Item name="intake" label="Intake" rules={[{ required: true, message: 'Please select the intake!' }]}>
-              <Select className="select-md" placeholder="Select Intake">
-                <Option value="Fall 2024">Fall 2024</Option>
-                <Option value="Winter 2025">Winter 2025</Option>
-                <Option value="Spring 2025">Spring 2025</Option>
-                <Option value="Summer 2025">Summer 2025</Option>
-                <Option value="Fall 2025">Fall 2025</Option>
-                <Option value="Winter 2026">Winter 2026</Option>
-                <Option value="Spring 2026">Spring 2026</Option>
-                <Option value="Summer 2026">Summer 2026</Option>
+            <Form.Item name="intake" label={<span className="dark:text-white">Intake</span>} rules={[{ required: true, message: 'Please select the intake!' }]}>
+              <Select className="select-md dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="Select Intake"
+                 dropdownStyle={{ backgroundColor: 'var(--color-darkgraylight)' }} // Dropdown background
+                 optionFilterProp="children"
+                 optionLabelProp="children" // Ensure children are used for rendering
+                >
+                <Option value="Fall 2024" className="dark:text-white">Fall 2024</Option>
+                <Option value="Winter 2025" className="dark:text-white">Winter 2025</Option>
+                <Option value="Spring 2025" className="dark:text-white">Spring 2025</Option>
+                <Option value="Summer 2025" className="dark:text-white">Summer 2025</Option>
+                <Option value="Fall 2025" className="dark:text-white">Fall 2025</Option>
+                <Option value="Winter 2026" className="dark:text-white">Winter 2026</Option>
+                <Option value="Spring 2026" className="dark:text-white">Spring 2026</Option>
+                <Option value="Summer 2026" className="dark:text-white">Summer 2026</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="universityLink" label="University Link" rules={[{ type: 'url', message: 'Please enter a valid URL!' }]}>
-              <Input className="form-control-input" placeholder="e.g., https://www.utoronto.ca" />
+            <Form.Item name="universityLink" label={<span className="dark:text-white">University Link</span>} rules={[{ type: 'url', message: 'Please enter a valid URL!' }]}>
+              <Input className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="e.g., https://www.utoronto.ca" />
             </Form.Item>
-            <Form.Item name="applicationDeadline" label="Application Deadline">
-              <DatePicker className="form-control-input" style={{ width: '100%' }} format="YYYY-MM-DD" />
+            <Form.Item name="applicationDeadline" label={<span className="dark:text-white">Application Deadline</span>}>
+              <DatePicker className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" style={{ width: '100%' }} format="YYYY-MM-DD"
+                popupClassName="dark-picker-popup" // Custom class for dropdown
+                />
             </Form.Item>
-            <Form.Item name="profileFit" label="Profile Fit" rules={[{ required: true, message: 'Please select profile fit!' }]}>
-              <Select className="select-md" placeholder="Select Profile Fit">
-                <Option value="High">High</Option>
-                <Option value="Medium">Medium</Option>
-                <Option value="Low">Low</Option>
+            <Form.Item name="profileFit" label={<span className="dark:text-white">Profile Fit</span>} rules={[{ required: true, message: 'Please select profile fit!' }]}>
+              <Select className="select-md dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="Select Profile Fit"
+                 dropdownStyle={{ backgroundColor: 'var(--color-darkgraylight)' }}
+                 optionFilterProp="children"
+                 optionLabelProp="children"
+              >
+                <Option value="High" className="dark:text-white">High</Option>
+                <Option value="Medium" className="dark:text-white">Medium</Option>
+                <Option value="Low" className="dark:text-white">Low</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="priority" label="Priority" rules={[{ required: true, message: 'Please select priority!' }]}>
-              <Select className="select-md" placeholder="Select Priority">
-                <Option value="High">High</Option>
-                <Option value="Medium">Medium</Option>
-                <Option value="Low">Low</Option>
+            <Form.Item name="priority" label={<span className="dark:text-white">Priority</span>} rules={[{ required: true, message: 'Please select priority!' }]}>
+              <Select className="select-md dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="Select Priority"
+                 dropdownStyle={{ backgroundColor: 'var(--color-darkgraylight)' }}
+                 optionFilterProp="children"
+                 optionLabelProp="children"
+              >
+                <Option value="High" className="dark:text-white">High</Option>
+                <Option value="Medium" className="dark:text-white">Medium</Option>
+                <Option value="Low" className="dark:text-white">Low</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="applicationStatus" label="Application Status" rules={[{ required: true, message: 'Please select application status!' }]}>
-              <Select className="select-md" placeholder="Select Status">
-                <Option value="Not Started">Not Started</Option>
-                <Option value="In Progress">In Progress</Option>
-                <Option value="Applied">Applied</Option>
-                <Option value="Admitted">Admitted</Option>
-                <Option value="Rejected">Rejected</Option>
-                <Option value="Deferred">Deferred</Option>
+            <Form.Item name="applicationStatus" label={<span className="dark:text-white">Application Status</span>} rules={[{ required: true, message: 'Please select application status!' }]}>
+              <Select className="select-md dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="Select Status"
+                 dropdownStyle={{ backgroundColor: 'var(--color-darkgraylight)' }}
+                 optionFilterProp="children"
+                 optionLabelProp="children"
+              >
+                <Option value="Not Started" className="dark:text-white">Not Started</Option>
+                <Option value="In Progress" className="dark:text-white">In Progress</Option>
+                <Option value="Applied" className="dark:text-white">Applied</Option>
+                <Option value="Admitted" className="dark:text-white">Admitted</Option>
+                <Option value="Rejected" className="dark:text-white">Rejected</Option>
+                <Option value="Deferred" className="dark:text-white">Deferred</Option>
               </Select>
             </Form.Item>
-            <Form.Item name="result" label="Result">
-              <Input className="form-control-input" placeholder="e.g., Pending, Admitted, Rejected" />
+            <Form.Item name="result" label={<span className="dark:text-white">Result</span>}>
+              <Input className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="e.g., Pending, Admitted, Rejected" />
             </Form.Item>
-            <Form.Item name="applicationFees" label="Application Fees" rules={[{ type: 'number', message: 'Please enter a valid number!', transform: value => Number(value) || 0 }]}>
-              <Input type="number" className="form-control-input" placeholder="e.g., 100" />
+            <Form.Item name="applicationFees" label={<span className="dark:text-white">Application Fees</span>} rules={[{ type: 'number', message: 'Please enter a valid number!', transform: value => Number(value) || 0 }]}>
+              <Input type="number" className="form-control-input dark:bg-darkgraylight dark:text-white dark:border-gray-700" placeholder="e.g., 100" />
             </Form.Item>
-            <Form.Item name="comments" label="Comments" className="md:col-span-2">
-              <Input.TextArea className="form-control-textarea" rows={3} placeholder="Any additional comments..." />
+            <Form.Item name="comments" label={<span className="dark:text-white">Comments</span>} className="md:col-span-2">
+              <Input.TextArea className="form-control-textarea dark:bg-darkgraylight dark:text-white dark:border-gray-700" rows={3} placeholder="Any additional comments..." />
             </Form.Item>
           </div>
           <Form.Item className="mt-4 flex justify-end">
@@ -633,121 +678,109 @@ const Applications: React.FC = () => {
               type="primary"
               htmlType="submit"
               icon={<SaveOutlined />}
-              className="bg-primary text-white hover:bg-yellow-500 transition-colors"
-              style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
+              className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:text-dark dark:bg-yellow-500 dark:hover:bg-yellow-600"
+              style={{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}
             >
-              {editingApplication ? "Update Application" : "Add Application"}
+              <span className="dark:text-dark">{editingApplication ? "Update" : "Add"} Application</span>
             </Button>
           </Form.Item>
         </Form>
       </Modal>
 
-      {/* Application Details Modal */}
+      {/* Detail View Modal (when a card is clicked) */}
       <Modal
         title={
-          <div className="flex items-center">
-            <span className="text-dark dark:text-white">
-              {selectedApplication ? `${selectedApplication.university} - Application Details` : "Application Details"}
-            </span>
-          </div>
+          <span className="text-dark dark:text-white">
+            Application Details: {selectedApplication?.university}
+          </span>
         }
         open={isDetailModalVisible}
-        onCancel={handleCloseDetailModal} // This handles the 'X' button and clicking outside
-        footer={[
-          <Button
-            key="delete"
-            onClick={() => {
-              if (selectedApplication?.id) {
-                handleDeleteApplication(selectedApplication.id); // Trigger custom delete modal
-                handleCloseDetailModal(); // Close the detail modal
-              }
-            }}
-            icon={<DeleteOutlined />}
-            danger
-            className="mr-2"
-          >
-            Delete
-          </Button>,
-          <Button
-            key="edit"
-            onClick={() => {
-              if (selectedApplication) {
-                handleEdit(selectedApplication); // Open edit modal
-                handleCloseDetailModal(); // Close detail modal
-              }
-            }}
-            className="dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600 mr-2"
-          >
-            Edit
-          </Button>,
-          <Button
-            key="close"
-            onClick={handleCloseDetailModal}
-            type="primary"
-            style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
-          >
-            Close
-          </Button>,
-        ]}
+        onCancel={handleCloseDetailModal}
+        footer={null}
         width={700}
         centered
-        className="application-detail-modal"
-        destroyOnHidden={true} // Applied the deprecation fix
+        className="application-detail-modal dark:bg-darkgray dark:text-white"
+        styles={{
+          content: { backgroundColor: 'var(--color-darkgray)' },
+          header: { backgroundColor: 'var(--color-darkgray)', borderBottom: '1px solid var(--color-gray-700)' },
+          body: { backgroundColor: 'var(--color-darkgray)' },
+        }}
       >
         {selectedApplication && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-bodytext dark:text-gray-200 text-base mt-4">
-            <div><strong>City:</strong> {selectedApplication.city}</div>
-            <div><strong>University:</strong> {selectedApplication.university}</div>
-            <div><strong>Course:</strong> {selectedApplication.course}</div>
-            <div><strong>Intake:</strong> {selectedApplication.intake}</div>
-            <div className="md:col-span-2">
-              <strong>University Link:</strong>{' '}
-              <a href={selectedApplication.universityLink} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline break-all">
-                {selectedApplication.universityLink}
-              </a>
-            </div>
-            <div><strong>Application Deadline:</strong> {selectedApplication.applicationDeadline || 'N/A'}</div>
-            <div><strong>Profile Fit:</strong> {selectedApplication.profileFit}</div>
-            <div><strong>Priority:</strong> {selectedApplication.priority}</div>
-            <div><strong>Application Status:</strong> {selectedApplication.applicationStatus}</div>
-            <div><strong>Result:</strong> {selectedApplication.result || 'N/A'}</div>
-            <div><strong>Application Fees:</strong> ${selectedApplication.applicationFees}</div>
-            <div className="md:col-span-2">
-              <strong>Comments:</strong> {selectedApplication.comments || 'N/A'}
+          <div className="space-y-3 text-bodytext dark:text-gray-300">
+            <p><strong>City:</strong> {selectedApplication.city}</p>
+            <p><strong>Course:</strong> {selectedApplication.course}</p>
+            <p><strong>Intake:</strong> {selectedApplication.intake}</p>
+            {selectedApplication.universityLink && (
+              <p>
+                <strong>University Link:</strong>{" "}
+                <a
+                  href={selectedApplication.universityLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {selectedApplication.universityLink}
+                </a>
+              </p>
+            )}
+            <p><strong>Application Deadline:</strong> {selectedApplication.applicationDeadline || 'N/A'}</p>
+            <p><strong>Profile Fit:</strong> {selectedApplication.profileFit}</p>
+            <p><strong>Priority:</strong> {selectedApplication.priority}</p>
+            <p><strong>Application Status:</strong> {selectedApplication.applicationStatus}</p>
+            <p><strong>Result:</strong> {selectedApplication.result || 'N/A'}</p>
+            <p><strong>Application Fees:</strong> {selectedApplication.applicationFees || 0}</p>
+            <p><strong>Comments:</strong> {selectedApplication.comments || 'N/A'}</p>
+
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => {
+                  handleEdit(selectedApplication);
+                  handleCloseDetailModal(); // Close detail modal when opening edit modal
+                }}
+                className="dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600"
+              >
+                Edit
+              </Button>
+              <Button
+                icon={<DeleteOutlined />}
+                danger
+                onClick={() => {
+                  handleDeleteApplication(selectedApplication.id!);
+                  handleCloseDetailModal(); // Close detail modal when opening delete confirmation
+                }}
+              >
+                Delete
+              </Button>
             </div>
           </div>
         )}
       </Modal>
 
-      {/* NEW: Custom Delete Confirmation Modal */}
+      {/* Custom Delete Confirmation Modal */}
       <Modal
         title={
-          <div className="flex items-center text-dark dark:text-white">
-            <ExclamationCircleOutlined className="text-red-500 mr-2 text-xl" />
-            Confirm Deletion
-          </div>
+          <span className="text-dark dark:text-white flex items-center">
+            <ExclamationCircleOutlined className="mr-2 text-warning" /> Confirm Deletion
+          </span>
         }
         open={isDeleteConfirmModalVisible}
+        onOk={confirmDelete}
         onCancel={cancelDelete}
-        footer={[
-          <Button key="back" onClick={cancelDelete} className="dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600">
-            No, Keep It
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            danger // Make the button red
-            onClick={confirmDelete}
-            icon={<DeleteOutlined />}
-          >
-            Yes, Delete
-          </Button>,
-        ]}
+        okText="Delete"
+        cancelText="Cancel"
+        okButtonProps={{ danger: true }}
         centered
-        destroyOnHidden={true} // Ensure the modal content is destroyed
+        className="dark:bg-darkgray dark:text-white"
+        styles={{
+          content: { backgroundColor: 'var(--color-darkgray)' },
+          header: { backgroundColor: 'var(--color-darkgray)', borderBottom: '1px solid var(--color-gray-700)' },
+          body: { backgroundColor: 'var(--color-darkgray)' },
+        }}
       >
-        <p className="text-bodytext dark:text-gray-300 text-base py-4">
-          Are you absolutely sure you want to delete this application? This action cannot be undone.
+        <p className="text-bodytext dark:text-gray-300">
+          Are you sure you want to delete this application? This action cannot be undone.
         </p>
       </Modal>
     </div>

@@ -297,6 +297,129 @@
   white-space: normal;
 }
 
+
+/* Dark Mode styles for Ant Design Components - Added for EdulxPayments.tsx */
+
+/* Modal */
+.dark-modal .ant-modal-content {
+  background-color: var(--color-darkgray);
+  border: 1px solid var(--color-gray-700); /* Use a variable if you have one for dark borders */
+}
+
+.dark-modal .ant-modal-header {
+  background-color: var(--color-darkgray);
+  border-bottom: 1px solid var(--color-gray-700);
+}
+
+.dark-modal .ant-modal-close-x {
+  color: var(--color-white);
+}
+
+/* Table */
+.dark-ant-table .ant-table {
+  background-color: var(--color-darkgray);
+  color: var(--color-white);
+}
+
+.dark-ant-table .ant-table-wrapper {
+  background-color: var(--color-darkgray);
+}
+
+.dark-ant-table .ant-table-thead > tr > th {
+  background-color: var(--color-darkgraylight);
+  color: var(--color-white);
+  border-bottom: 1px solid var(--color-gray-700);
+}
+
+.dark-ant-table .ant-table-tbody > tr.ant-table-row:hover > td {
+  background-color: var(--color-darkgraylight); /* Slightly lighter hover for dark table */
+}
+
+.dark-ant-table .ant-table-tbody > tr > td {
+  background-color: var(--color-darkgray);
+  border-bottom: 1px solid var(--color-gray-700);
+  color: var(--color-white);
+}
+
+.dark-ant-table .ant-pagination-item,
+.dark-ant-table .ant-pagination-options-size-changer.ant-select .ant-select-selector {
+  background-color: var(--color-darkgraylight);
+  border: 1px solid var(--color-gray-700);
+  color: var(--color-white);
+}
+
+.dark-ant-table .ant-pagination-item-link {
+    background-color: var(--color-darkgraylight);
+    border: 1px solid var(--color-gray-700);
+    color: var(--color-white);
+}
+
+.dark-ant-table .ant-pagination-item-active {
+  background-color: var(--color-primary); /* Use your primary color for active page */
+  border-color: var(--color-primary);
+  color: var(--color-dark); /* Text color on primary background */
+}
+
+.dark-ant-table .ant-pagination-item-active a {
+  color: var(--color-dark); /* Ensure link text is readable */
+}
+
+
+/* Select (Form Item and standalone) */
+.dark-ant-select .ant-select-selector {
+  background-color: var(--color-darkgraylight) !important;
+  border: 1px solid var(--color-gray-700) !important;
+  color: var(--color-white) !important;
+}
+
+.dark-ant-select .ant-select-selection-placeholder {
+  color: var(--color-gray-400) !important;
+}
+
+.dark-ant-select .ant-select-arrow {
+  color: var(--color-white) !important;
+}
+
+/* Select Dropdown Menu (Popper) */
+.dark-ant-select-dropdown {
+  background-color: var(--color-darkgraylight) !important;
+  border: 1px solid var(--color-gray-700) !important;
+}
+
+.dark-ant-select-dropdown .ant-select-item {
+  color: var(--color-white) !important;
+}
+
+.dark-ant-select-dropdown .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background-color: var(--color-gray-700) !important;
+  color: var(--color-white) !important;
+}
+
+.dark-ant-select-dropdown .ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background-color: var(--color-gray-800) !important;
+  color: var(--color-white) !important;
+}
+
+
+/* Popconfirm */
+.dark-popconfirm .ant-popover-content {
+  background-color: var(--color-darkgray);
+  border: 1px solid var(--color-gray-700);
+}
+
+.dark-popconfirm .ant-popover-inner {
+  background-color: var(--color-darkgray);
+}
+
+.dark-popconfirm .ant-popover-message {
+  color: var(--color-white);
+}
+
+.dark-popconfirm .ant-popover-arrow::before {
+  background-color: var(--color-darkgray);
+  border: 1px solid var(--color-gray-700); /* Match border of content */
+}
+
 } /* END @layer components */
 
 /* Dark mode specific color for --color-border-light */

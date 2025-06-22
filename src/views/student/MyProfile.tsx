@@ -9,10 +9,11 @@ import { db, storage } from "src/firebase";
 import { useAuth } from "src/context/AuthContext";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import Select from "react-select";
+import Select, { ActionMeta, SingleValue, MultiValue } from "react-select"; // Import types for react-select
 import makeAnimated from "react-select/animated";
 import {
-  COUNTRIES, COURSES, EDUCATION_LEVELS, GENDERS, UNIVERSITIES, SEMESTER_OPTIONS // Ensure all these are used or remove unused
+  COUNTRIES, COURSES, // Keep only used imports
+  // Removed: EDUCATION_LEVELS, GENDERS, UNIVERSITIES, SEMESTER_OPTIONS
 } from "src/constants/DROPDOWN_OPTIONS";
 import { Progress } from 'antd'; // Ant Design Progress
 
@@ -31,12 +32,12 @@ interface MyProfileForm {
   universityName: string;
   uniStart: Date | null;
   uniEnd: Date | null;
-  fieldOfStudy: string;
+  fieldOfStudy: string; // This is for Bachelor's field of study
   internshipRole: string;
   internshipArea: string;
   internshipStart: Date | null;
   internshipEnd: Date | null;
-  intake: string;
+  intake: string; // Assuming this is for preferred intake (e.g., Summer/Winter)
   preferredCountries: string[];
   languages: string;
   tenthGrades: string;
@@ -44,7 +45,7 @@ interface MyProfileForm {
   bachelorGrades: string;
   ieltsScore: string;
   otherLanguageGrades: string;
-  desiredCourse: string;
+  desiredCourse: string; // This is the desired course abroad
 }
 
 // Export initialForm so it can be used by other components/hooks (e.g., useProfileCompletion)
@@ -85,9 +86,6 @@ const MyProfile = () => {
     const [isExisting, setIsExisting] = useState(false);
     const [imageUploadProgress, setImageUploadProgress] = useState(0);
 
-    // loadProfile and loadProfileImage are stable functions and don't need useCallback
-    // as their dependencies (`user`, `db`, `storage`) are either from context (stable reference)
-    // or imported modules (stable). They are correctly placed in useEffect's dependency array.
     const loadProfile = async () => {
       if (!user || !user.uid) return;
 
@@ -131,8 +129,8 @@ const MyProfile = () => {
         const imgRef = storageRef(storage, `students/${user.uid}/profile.jpg`);
         const url = await getDownloadURL(imgRef);
         setProfileImage(url);
-      } catch (err: any) { // Catching as any for broader compatibility with Firebase error types
-        console.log(`No profile image found for user ${user.uid} or other load error:`, err.code);
+      } catch (err: any) {
+        // console.log(`No profile image found for user ${user.uid} or other load error:`, err.code);
         setProfileImage(""); // Clear image if not found or error
       }
     };
@@ -186,9 +184,21 @@ const MyProfile = () => {
       }
     };
 
-    const handleChange = (field: keyof MyProfileForm, value: any) => {
+    // Generic handleChange for input fields
+    const handleChange = (field: keyof MyProfileForm, value: string | Date | string[] | null) => {
       setForm((prev) => ({ ...prev, [field]: value }));
     };
+
+    // Typed handleChange for React-Select single value
+    const handleSelectChange = (field: keyof MyProfileForm, option: SingleValue<{ value: string; label: string }>) => {
+      handleChange(field, option ? option.value : "");
+    };
+
+    // Typed handleChange for React-Select multi value
+    const handleMultiSelectChange = (field: keyof MyProfileForm, options: MultiValue<{ value: string; label: string }>) => {
+      handleChange(field, options ? options.map(o => o.value) : []);
+    };
+
 
     const handleSave = async () => {
       if (!user) {
@@ -246,6 +256,7 @@ const MyProfile = () => {
         return !isNaN(value.getTime());
       }
       // For any other type (number, boolean, etc.), check if it has a truthy value
+      // Although MyProfileForm only contains string, Date, string[] for now
       return !!value;
     }).length;
 
@@ -265,8 +276,8 @@ const MyProfile = () => {
                   status={profileCompletionProgress === 100 ? 'success' : 'active'}
                   format={(percent) => `${filledFields}/${totalFields} fields completed (${percent?.toFixed(0)}%)`}
                   strokeColor={{
-                    from: '#374151',
-                    to: '#FBCC32',
+                    from: 'var(--color-darkgray)', // Using CSS variable
+                    to: 'var(--color-warning)',    // Using CSS variable
                   }}
                 />
                 <p className="text-sm text-gray-500 mt-1 dark:text-gray-400">
@@ -297,8 +308,8 @@ const MyProfile = () => {
                         format={(percent) => `${percent?.toFixed(0)}%`}
                         showInfo={true}
                         strokeColor={{
-                          from: '#108ee9',
-                          to: '#87d068',
+                          from: 'var(--color-info)', // Using CSS variable
+                          to: 'var(--color-success)', // Using CSS variable
                         }}
                         className="w-full mt-1"
                     />
@@ -310,69 +321,327 @@ const MyProfile = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {/* Form fields */}
-          <input className="input-field" placeholder="Full Name" value={form.fullName} onChange={(e) => handleChange("fullName", e.target.value)} />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Full Name"
+            value={form.fullName}
+            onChange={(e) => handleChange("fullName", e.target.value)}
+          />
           <div className="flex gap-2">
-            <DatePicker selected={form.dob} onChange={(d) => handleChange("dob", d)} placeholderText="Date of Birth" className="input-field" />
-            <input className="input-field flex-1" placeholder="Place of Birth" value={form.placeOfBirth} onChange={(e) => handleChange("placeOfBirth", e.target.value)} />
+            <DatePicker
+              selected={form.dob}
+              onChange={(d: Date | null) => handleChange("dob", d)} // Explicitly type d
+              placeholderText="Date of Birth"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper" // Custom class for popper
+              calendarClassName="dark-datepicker-calendar" // Custom class for calendar
+            />
+            <input
+              className="input-field flex-1 dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+              placeholder="Place of Birth"
+              value={form.placeOfBirth}
+              onChange={(e) => handleChange("placeOfBirth", e.target.value)}
+            />
           </div>
-          <input className="input-field" placeholder="Address in India" value={form.address} onChange={(e) => handleChange("address", e.target.value)} />
-          <input className="input-field" placeholder="Phone Number" value={form.phone} onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, "").slice(0, 10))} />
-          <input className="input-field" placeholder="School Name" value={form.schoolName} onChange={(e) => handleChange("schoolName", e.target.value)} />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Address in India"
+            value={form.address}
+            onChange={(e) => handleChange("address", e.target.value)}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Phone Number"
+            value={form.phone}
+            onChange={(e) => handleChange("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="School Name"
+            value={form.schoolName}
+            onChange={(e) => handleChange("schoolName", e.target.value)}
+          />
           <div className="flex gap-2">
-            <DatePicker selected={form.schoolStart} onChange={(d) => handleChange("schoolStart", d)} placeholderText="Start" className="input-field" />
-            <DatePicker selected={form.schoolEnd} onChange={(d) => handleChange("schoolEnd", d)} placeholderText="End" className="input-field" />
+            <DatePicker
+              selected={form.schoolStart}
+              onChange={(d: Date | null) => handleChange("schoolStart", d)}
+              placeholderText="Start"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper"
+              calendarClassName="dark-datepicker-calendar"
+            />
+            <DatePicker
+              selected={form.schoolEnd}
+              onChange={(d: Date | null) => handleChange("schoolEnd", d)}
+              placeholderText="End"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper"
+              calendarClassName="dark-datepicker-calendar"
+            />
           </div>
-          <input className="input-field" placeholder="University Name" value={form.universityName} onChange={(e) => handleChange("universityName", e.target.value)} />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="University Name"
+            value={form.universityName}
+            onChange={(e) => handleChange("universityName", e.target.value)}
+          />
           <div className="flex gap-2">
-            <DatePicker selected={form.uniStart} onChange={(d) => handleChange("uniStart", d)} placeholderText="Start" className="input-field" />
-            <DatePicker selected={form.uniEnd} onChange={(d) => handleChange("uniEnd", d)} placeholderText="End" className="input-field" />
+            <DatePicker
+              selected={form.uniStart}
+              onChange={(d: Date | null) => handleChange("uniStart", d)}
+              placeholderText="Start"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper"
+              calendarClassName="dark-datepicker-calendar"
+            />
+            <DatePicker
+              selected={form.uniEnd}
+              onChange={(d: Date | null) => handleChange("uniEnd", d)}
+              placeholderText="End"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper"
+              calendarClassName="dark-datepicker-calendar"
+            />
           </div>
-          {/* Using a union type for onChange, as value can be {value, label} for single selects or array for multi */}
           <Select
             options={COURSES}
             placeholder="Field of Study (Bachelor)"
-            onChange={(e: any) => handleChange("fieldOfStudy", e?.value)}
+            onChange={(option) => handleSelectChange("fieldOfStudy", option)}
             value={COURSES.find(opt => opt.value === form.fieldOfStudy)}
             className="text-sm react-select-container"
             classNamePrefix="react-select"
+            styles={{ // Inline styles for react-select components for dark mode
+              control: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+                borderColor: 'var(--color-gray-700)',
+                color: 'var(--color-white)',
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              input: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                color: 'var(--color-gray-400)',
+              }),
+              menu: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                backgroundColor: state.isFocused ? 'var(--color-gray-700)' : 'var(--color-darkgraylight)',
+                color: 'var(--color-white)',
+                '&:active': {
+                  backgroundColor: 'var(--color-gray-600)',
+                },
+              }),
+            }}
           />
-          <input className="input-field" placeholder="Internship Role" value={form.internshipRole} onChange={(e) => handleChange("internshipRole", e.target.value)} />
-          <input className="input-field" placeholder="Internship Area" value={form.internshipArea} onChange={(e) => handleChange("internshipArea", e.target.value)} />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Internship Role"
+            value={form.internshipRole}
+            onChange={(e) => handleChange("internshipRole", e.target.value)}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Internship Area"
+            value={form.internshipArea}
+            onChange={(e) => handleChange("internshipArea", e.target.value)}
+          />
           <div className="flex gap-2">
-            <DatePicker selected={form.internshipStart} onChange={(d) => handleChange("internshipStart", d)} placeholderText="Start" className="input-field" />
-            <DatePicker selected={form.internshipEnd} onChange={(d) => handleChange("internshipEnd", d)} placeholderText="End" className="input-field" />
+            <DatePicker
+              selected={form.internshipStart}
+              onChange={(d: Date | null) => handleChange("internshipStart", d)}
+              placeholderText="Start"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper"
+              calendarClassName="dark-datepicker-calendar"
+            />
+            <DatePicker
+              selected={form.internshipEnd}
+              onChange={(d: Date | null) => handleChange("internshipEnd", d)}
+              placeholderText="End"
+              className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700 custom-datepicker"
+              popperClassName="dark-datepicker-popper"
+              calendarClassName="dark-datepicker-calendar"
+            />
           </div>
           <Select
             options={[{ value: "Summer", label: "Summer" }, { value: "Winter", label: "Winter" }]}
             placeholder="Intake"
-            onChange={(e: any) => handleChange("intake", e?.value)}
-            value={{ value: form.intake, label: form.intake }}
+            onChange={(option) => handleSelectChange("intake", option)}
+            value={form.intake ? { value: form.intake, label: form.intake } : null} // Handle empty string intake
             className="text-sm react-select-container"
             classNamePrefix="react-select"
+            styles={{ // Inline styles for react-select components for dark mode
+              control: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+                borderColor: 'var(--color-gray-700)',
+                color: 'var(--color-white)',
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              input: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                color: 'var(--color-gray-400)',
+              }),
+              menu: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                backgroundColor: state.isFocused ? 'var(--color-gray-700)' : 'var(--color-darkgraylight)',
+                color: 'var(--color-white)',
+                '&:active': {
+                  backgroundColor: 'var(--color-gray-600)',
+                },
+              }),
+            }}
           />
           <Select
             components={animatedComponents}
             isMulti
             options={COUNTRIES}
             placeholder="Preferred Countries"
-            onChange={(opts) => handleChange("preferredCountries", opts.map(o => o.value))}
+            onChange={(options) => handleMultiSelectChange("preferredCountries", options)}
             value={COUNTRIES.filter(c => form.preferredCountries.includes(c.value))}
             className="text-sm react-select-container"
             classNamePrefix="react-select"
+            styles={{ // Inline styles for react-select components for dark mode
+              control: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+                borderColor: 'var(--color-gray-700)',
+                color: 'var(--color-white)',
+              }),
+              multiValue: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-gray-700)',
+              }),
+              multiValueLabel: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              multiValueRemove: (provided) => ({
+                ...provided,
+                color: 'var(--color-gray-400)',
+                '&:hover': {
+                  backgroundColor: 'var(--color-red-500)',
+                  color: 'var(--color-white)',
+                },
+              }),
+              input: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                color: 'var(--color-gray-400)',
+              }),
+              menu: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                backgroundColor: state.isFocused ? 'var(--color-gray-700)' : 'var(--color-darkgraylight)',
+                color: 'var(--color-white)',
+                '&:active': {
+                  backgroundColor: 'var(--color-gray-600)',
+                },
+              }),
+            }}
           />
-          <input className="input-field" placeholder="Languages Spoken" value={form.languages} onChange={(e) => handleChange("languages", e.target.value)} />
-          <input className="input-field" placeholder="10th Grades" value={form.tenthGrades} onChange={(e) => handleChange("tenthGrades", e.target.value)} />
-          <input className="input-field" placeholder="12th Grades" value={form.twelfthGrades} onChange={(e) => handleChange("twelfthGrades", e.target.value)} />
-          <input className="input-field" placeholder="Bachelor Grades" value={form.bachelorGrades} onChange={(e) => handleChange("bachelorGrades", e.target.value)} />
-          <input className="input-field" placeholder="IELTS Score" value={form.ieltsScore} onChange={(e) => handleChange("ieltsScore", e.target.value)} />
-          <input className="input-field" placeholder="Other Languages & Grades" value={form.otherLanguageGrades} onChange={(e) => handleChange("otherLanguageGrades", e.target.value)} />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Languages Spoken (e.g., English, Hindi)"
+            value={form.languages}
+            onChange={(e) => handleChange("languages", e.target.value)}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="10th Grades (e.g., 90%)"
+            value={form.tenthGrades}
+            onChange={(e) => handleChange("tenthGrades", e.target.value)}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="12th Grades (e.g., 85%)"
+            value={form.twelfthGrades}
+            onChange={(e) => handleChange("twelfthGrades", e.target.value)}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="Bachelor Grades (e.g., 7.5 CGPA)"
+            value={form.bachelorGrades}
+            onChange={(e) => handleChange("bachelorGrades", e.target.value)}
+          />
+          <input
+            className="input-field dark:bg-darkgraylight dark:text-white dark:border-gray-700"
+            placeholder="IELTS Score (e.g., 7.0 Overall)"
+            value={form.ieltsScore}
+            onChange={(e) => handleChange("ieltsScore", e.target.value)}
+          />
+          <input
+            className="input-field"
+            placeholder="Other Languages & Grades (e.g., French: B1)"
+            value={form.otherLanguageGrades}
+            onChange={(e) => handleChange("otherLanguageGrades", e.target.value)}
+          />
           <Select
             options={COURSES}
             placeholder="Desired Course Abroad"
-            onChange={(e: any) => handleChange("desiredCourse", e?.value)}
+            onChange={(option) => handleSelectChange("desiredCourse", option)}
             value={COURSES.find(opt => opt.value === form.desiredCourse)}
             className="text-sm react-select-container"
             classNamePrefix="react-select"
+            styles={{ // Inline styles for react-select components for dark mode
+              control: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+                borderColor: 'var(--color-gray-700)',
+                color: 'var(--color-white)',
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              input: (provided) => ({
+                ...provided,
+                color: 'var(--color-white)',
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                color: 'var(--color-gray-400)',
+              }),
+              menu: (provided) => ({
+                ...provided,
+                backgroundColor: 'var(--color-darkgraylight)',
+              }),
+              option: (provided, state) => ({
+                ...provided,
+                backgroundColor: state.isFocused ? 'var(--color-gray-700)' : 'var(--color-darkgraylight)',
+                color: 'var(--color-white)',
+                '&:active': {
+                  backgroundColor: 'var(--color-gray-600)',
+                },
+              }),
+            }}
           />
         </div>
 

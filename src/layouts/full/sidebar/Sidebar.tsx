@@ -1,3 +1,4 @@
+// src/layouts/full/sidebar/Sidebar.tsx
 import { Sidebar } from 'flowbite-react';
 import React from 'react';
 import SimpleBar from 'simplebar-react';
@@ -5,7 +6,7 @@ import FullLogo from '../shared/logo/FullLogo';
 import NavItems from './NavItems';
 import SidebarContent from './Sidebaritems';
 import ShareAndEarn from './ShareAndEarn'; // Import the ShareAndEarn component
-import { Icon } from '@iconify/react';
+// import { Icon } from '@iconify/react'; // Removed as it's not used in this component
 
 
 const SidebarLayout = () => {
@@ -29,8 +30,8 @@ const SidebarLayout = () => {
                         <h5 className="text-link dark:text-white/70 caption font-semibold leading-6 tracking-widest text-xs pb-2 uppercase">
                           {item.heading}
                         </h5>
-                        {item.children?.map((child, index) => (
-                          <React.Fragment key={child.id && index}>
+                        {item.children?.map((child, childIndex) => ( // Changed index to childIndex for clarity and unique keys
+                          <React.Fragment key={child.id || childIndex}> {/* Use child.id if available, fallback to unique index */}
                             <NavItems item={child} />
                           </React.Fragment>
                         ))}

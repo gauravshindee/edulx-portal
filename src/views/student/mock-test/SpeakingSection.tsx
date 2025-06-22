@@ -1,6 +1,6 @@
 // src/views/student/mock-test/SpeakingSection.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, IconButton, Paper, Divider } from '@mui/material';
+import { Box, Typography, Button, IconButton, Paper } from '@mui/material'; // Removed Divider as it was unused
 import MicIcon from '@mui/icons-material/Mic';
 import StopIcon from '@mui/icons-material/Stop';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -9,9 +9,29 @@ import DownloadIcon from '@mui/icons-material/Download';
 // Imported TEST_DURATIONS from the parent MockTest component
 import { TEST_DURATIONS } from '../MockTest';
 
+// Define more specific interfaces for better type safety
+interface Part1Data {
+  questions: string[];
+}
+
+interface Part2Data {
+  cueCard: string;
+  prompts: string[];
+}
+
+interface Part3Data {
+  questions: string[];
+}
+
+interface SpeakingData {
+  part1: Part1Data;
+  part2: Part2Data;
+  part3: Part3Data;
+}
+
 interface SpeakingSectionProps {
-  data: any; // Speaking prompts (questions, cue card)
-  onAnswersChange: (answers: any) => void;
+  data: SpeakingData; // Use the specific interface
+  onAnswersChange: (answers: { [part: string]: string | null }) => void; // Answers are audio URLs
   isTestActive: boolean;
   onSectionEnd: () => void;
 }
@@ -21,7 +41,9 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
   const [audioURL, setAudioURL] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const currentPartRef = useRef<number>(1); // To track which part of the speaking test
+
+  // Changed from useRef to useState to trigger UI re-renders
+  const [currentPart, setCurrentPart] = useState<number>(1);
   const [currentQuestion, setCurrentQuestion] = useState<string>('');
   const [part2PrepTime, setPart2PrepTime] = useState<number>(60); // 1 minute for Part 2 prep
   const [part2SpeakTime, setPart2SpeakTime] = useState<number>(120); // 2 minutes for Part 2 speaking
@@ -40,11 +62,13 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
         const url = URL.createObjectURL(audioBlob);
         setAudioURL(url);
         audioChunksRef.current = []; // Clear chunks for next recording
-        onAnswersChange((prev: any) => ({
+        onAnswersChange((prev: { [key: string]: string | null }) => ({
           ...prev,
-          [`part${currentPartRef.current}`]: url, // Save the URL for the current part
+          [`part${currentPart}`]: url, // Use currentPart state here
         }));
       };
+      // Keep stream active to avoid re-requesting access on every recording start/stop
+      // If you need to release the microphone after the test, manage the stream's lifecycle.
       return true;
     } catch (err) {
       console.error('Error accessing microphone:', err);
@@ -61,7 +85,7 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
 
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
       audioChunksRef.current = []; // Clear previous chunks
-      setAudioURL(null); // Clear previous recording
+      setAudioURL(null); // Clear previous recording URL in UI
       mediaRecorderRef.current.start();
       setRecording(true);
       console.log('Recording started...');
@@ -87,7 +111,7 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
     if (audioURL) {
       const a = document.createElement('a');
       a.href = audioURL;
-      a.download = `ielts-speaking-part-${currentPartRef.current}-recording.wav`;
+      a.download = `ielts-speaking-part-${currentPart}-recording.wav`; // Use currentPart state
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -98,43 +122,50 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
   useEffect(() => {
     if (!isTestActive || !data) return;
 
-    let timer: NodeJS.Timeout | undefined;
+    let partTimer: NodeJS.Timeout | undefined; // For general part transitions
+    let prepInterval: NodeJS.Timeout | undefined; // For Part 2 preparation timer
+    let speakInterval: NodeJS.Timeout | undefined; // For Part 2 speaking timer
 
-    const simulateExaminer = () => {
-      // Clear any previous timer before setting a new one
-      if (timer) clearTimeout(timer);
+    const setupPart = (part: number) => {
+      // Clear any previous timers to prevent multiple timers running
+      if (partTimer) clearTimeout(partTimer);
+      if (prepInterval) clearInterval(prepInterval);
+      if (speakInterval) clearInterval(speakInterval);
 
-      switch (currentPartRef.current) {
+      // Reset part 2 timers when setting up a new part
+      setPart2PrepTime(60);
+      setPart2SpeakTime(120);
+
+      switch (part) {
         case 1:
           setCurrentQuestion(data.part1.questions[0]); // Display first question of Part 1
           // Simulate a short duration for Part 1 or wait for explicit "Next Speaking Part" click
-          timer = setTimeout(() => {
-            if (currentPartRef.current === 1) { // Check if still in Part 1
-              currentPartRef.current = 2;
-              simulateExaminer();
-            }
-          }, 5 * 1000); // For example, 5 seconds for a single question prompt
+          // This timer handles the automatic transition if not manually advanced
+          partTimer = setTimeout(() => {
+            setCurrentPart(2); // Automatically move to Part 2
+          }, 15 * 1000); // Example: 15 seconds for initial Part 1 prompt and answer expectation
           break;
         case 2:
           // Part 2: Cue card + 1 min prep + 2 min talk
           setCurrentQuestion(`Part 2: You will have 1 minute to prepare. Then, you will speak for 1 to 2 minutes.`);
-          let prepTime = 60;
-          setPart2PrepTime(prepTime);
-          const prepTimer = setInterval(() => {
-            prepTime--;
-            setPart2PrepTime(prepTime);
-            if (prepTime <= 0) {
-              clearInterval(prepTimer);
+          let currentPrep = 60;
+          setPart2PrepTime(currentPrep);
+
+          prepInterval = setInterval(() => {
+            currentPrep--;
+            setPart2PrepTime(currentPrep);
+            if (currentPrep <= 0) {
+              clearInterval(prepInterval);
               setCurrentQuestion(`Part 2: Speak about: "${data.part2.cueCard}" (You have 2 minutes to speak)`);
-              let speakTime = 120;
-              setPart2SpeakTime(speakTime);
-              const speakTimer = setInterval(() => {
-                speakTime--;
-                setPart2SpeakTime(speakTime);
-                if (speakTime <= 0) {
-                  clearInterval(speakTimer);
-                  currentPartRef.current = 3;
-                  simulateExaminer();
+              let currentSpeak = 120;
+              setPart2SpeakTime(currentSpeak);
+
+              speakInterval = setInterval(() => {
+                currentSpeak--;
+                setPart2SpeakTime(currentSpeak);
+                if (currentSpeak <= 0) {
+                  clearInterval(speakInterval);
+                  setCurrentPart(3); // Automatically move to Part 3
                 }
               }, 1000);
             }
@@ -142,21 +173,33 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
           break;
         case 3:
           setCurrentQuestion(data.part3.questions[0]); // Display first question of Part 3
-          timer = setTimeout(() => {
-            onSectionEnd(); // Signal the end of the speaking section after the full allocated time
-          }, TEST_DURATIONS.Speaking * 1000); // Allows roughly the full speaking test duration
+          // This timer signals the end of the entire speaking section
+          partTimer = setTimeout(() => {
+            onSectionEnd(); // Signal the end of the speaking section
+          }, TEST_DURATIONS.Speaking * 1000); // Ensures the speaking section has a total duration
           break;
         default:
+          onSectionEnd(); // Fallback to end section if an invalid part is somehow reached
           break;
       }
     };
 
-    simulateExaminer();
+    // Initialize or re-setup the part when `currentPart` or `isTestActive` changes
+    setupPart(currentPart);
 
+    // Cleanup function: Clear all timers when the effect cleans up or re-runs
     return () => {
-      if (timer) clearTimeout(timer);
+      if (partTimer) clearTimeout(partTimer);
+      if (prepInterval) clearInterval(prepInterval);
+      if (speakInterval) clearInterval(speakInterval);
+      // It's also good practice to stop the MediaRecorder and release the stream
+      // when the component unmounts or the test ends.
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
     };
-  }, [isTestActive, data, onSectionEnd]);
+  }, [isTestActive, data, onSectionEnd, currentPart]); // Dependencies: currentPart is crucial here
 
   if (!data) {
     return <Typography>No speaking test data available.</Typography>;
@@ -170,10 +213,10 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
       </Typography>
 
       <Paper elevation={1} sx={{ p: { xs: 2, md: 3 }, mb: 4 }}> {/* Responsive padding */}
-        <Typography variant="h6" mb={2}>Part {currentPartRef.current}:</Typography>
+        <Typography variant="h6" mb={2}>Part {currentPart}:</Typography> {/* Use currentPart state */}
         <Typography variant="body1" mb={2} sx={{ color: '#FBCC32', fontWeight: 'bold' }}>
-          {currentPartRef.current === 1 && currentQuestion}
-          {currentPartRef.current === 2 && (
+          {currentPart === 1 && currentQuestion}
+          {currentPart === 2 && (
               <>
                 <Typography variant="subtitle1" sx={{mb:1}}>Cue Card: {data.part2.cueCard}</Typography>
                 {data.part2.prompts.map((p: string, idx: number) => (
@@ -184,7 +227,7 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
                 </Typography>
               </>
           )}
-          {currentPartRef.current === 3 && currentQuestion}
+          {currentPart === 3 && currentQuestion}
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, gap: 2, mt: 3 }}>
@@ -241,10 +284,9 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
         </Typography>
       </Paper>
 
-      {/* For navigation between speaking parts, you might need manual buttons or timed transitions */}
-      {/* This internal navigation logic can be refined based on actual IELTS speaking flow */}
+      {/* Manual button to advance parts (useful for testing or explicit user control) */}
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-        {currentPartRef.current < 3 && ( // Only show if not in the last part of speaking test
+        {currentPart < 3 && ( // Only show if not in the last part of speaking test
           <Button
             variant="outlined"
             sx={{
@@ -258,18 +300,10 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
               textTransform: 'none',
             }}
             onClick={() => {
-            stopRecording();
-            currentPartRef.current++;
-            setCurrentQuestion(''); // Clear current question for smooth transition
-            if (currentPartRef.current === 2) {
-                setPart2PrepTime(60);
-                setPart2SpeakTime(120);
-            }
-            setTimeout(() => {
-                if (currentPartRef.current === 1) setCurrentQuestion(data.part1.questions[0]);
-                if (currentPartRef.current === 3) setCurrentQuestion(data.part3.questions[0]);
-            }, 500);
-          }}>
+              stopRecording(); // Stop current recording before moving to next part
+              setCurrentPart(prev => prev + 1); // Increment part using state
+              // The `useEffect` will handle setting the new question and timers for the next part
+            }}>
             Next Speaking Part
           </Button>
         )}

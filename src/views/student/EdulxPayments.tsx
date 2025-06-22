@@ -30,7 +30,7 @@ interface PaymentRecord {
   amountPaid: number;
   paymentMethod: string; // e.g., "Bank Transfer", "UPI"
   bankDetailsUsed: string; // Snapshot of details used for audit
-  transactionId?: string | null; // Can be string or null, not undefined
+  transactionId: string | null; // Can be string or null, updated from optional to null for empty
   receiptUrl: string; // URL to the uploaded receipt in Firebase Storage
   uploadedAt: Timestamp;
   status: 'Pending Review' | 'Approved' | 'Rejected';
@@ -130,6 +130,7 @@ const EdulxPayments: React.FC = () => {
           uploadedAt: doc.data().uploadedAt instanceof Timestamp ? doc.data().uploadedAt : Timestamp.now(), // Ensure Timestamp type
           amountPaid: Number(doc.data().amountPaid) || 0,
           packagePrice: Number(doc.data().packagePrice) || 0,
+          transactionId: doc.data().transactionId || null, // Ensure null for empty
         })) as PaymentRecord[];
         setPayments(paymentsData.sort((a, b) => b.uploadedAt.toMillis() - a.uploadedAt.toMillis())); // Sort by newest first
         setLoading(false);
@@ -208,7 +209,7 @@ const EdulxPayments: React.FC = () => {
 
     const file = fileList[0];
     const fileName = `${selectedPackage.name}_${dayjs().format('YYYYMMDDHHmmss')}_${file.name}`;
-    // --- UPDATED STORAGE PATH: Now uses 'students' ---
+    // --- UPDATED STORAGE PATH: Now uses 'students' for consistency ---
     const storagePath = `students/${user.uid}/payment_receipts/${fileName}`;
     const receiptRef = storageRef(storage, storagePath);
 
@@ -226,9 +227,7 @@ const EdulxPayments: React.FC = () => {
         amountPaid: amountPaidValue, // Use validated amount
         paymentMethod: values.paymentMethod,
         bankDetailsUsed: JSON.stringify(BANKING_DETAILS), // Store a snapshot of details
-        // --- FIX FOR UNDEFINED ERROR: Use null if transactionId is empty ---
-        transactionId: values.transactionId || null,
-        // --- END FIX ---
+        transactionId: values.transactionId || null, // Ensure null for empty string
         receiptUrl: receiptUrl,
         uploadedAt: Timestamp.now(),
         status: 'Pending Review', // Initial status
@@ -256,16 +255,25 @@ const EdulxPayments: React.FC = () => {
     setLoading(true);
     try {
       // Delete from Firestore
-      // Firestore paths remain 'users'
+      // Firestore paths for payments remain 'users'
       await deleteDoc(doc(db, `users/${user.uid}/payments`, paymentId));
 
       // Delete from Storage if URL exists
       if (receiptUrl) {
         // IMPORTANT: The receiptUrl stored in Firestore will have the full path
-        // (either 'users/...' for old payments or 'students/...' for new ones).
+        // (e.g., 'users/...' for old payments or 'students/...' for new ones).
         // `storageRef(storage, receiptUrl)` correctly handles this as long as the URL is the full path.
         const fileRef = storageRef(storage, receiptUrl);
-        await deleteObject(fileRef).catch((e) => console.warn("Could not delete file from storage (might not exist or permission denied):", e));
+        await deleteObject(fileRef)
+          .then(() => message.success('Associated receipt deleted from storage.'))
+          .catch((e) => {
+            // Log a warning instead of an error if the file simply doesn't exist
+            if (e.code === 'storage/object-not-found') {
+              console.warn("Could not delete file from storage (object not found):", e.message);
+            } else {
+              console.error("Error deleting file from storage:", e);
+            }
+          });
       }
 
       message.success('Payment record deleted successfully!');
@@ -301,7 +309,7 @@ const EdulxPayments: React.FC = () => {
       dataIndex: 'packageName',
       key: 'packageName',
       render: (text: string, record: PaymentRecord) => (
-        <span>
+        <span className="text-dark dark:text-white">
           {text} {record.installmentNumber ? `(Installment ${record.installmentNumber})` : ''}
         </span>
       ),
@@ -310,13 +318,13 @@ const EdulxPayments: React.FC = () => {
       title: 'Amount Paid (₹)',
       dataIndex: 'amountPaid',
       key: 'amountPaid',
-      render: (amount: number) => `₹${amount.toLocaleString('en-IN')}`,
+      render: (amount: number) => <span className="text-dark dark:text-white">₹{amount.toLocaleString('en-IN')}</span>,
     },
     {
       title: 'Uploaded On',
       dataIndex: 'uploadedAt',
       key: 'uploadedAt',
-      render: (ts: Timestamp) => dayjs(ts.toDate()).format('MMM D,YYYY h:mm A'),
+      render: (ts: Timestamp) => <span className="text-dark dark:text-white">{dayjs(ts.toDate()).format('MMM D, YYYY h:mm A')}</span>,
     },
     {
       title: 'Status',
@@ -333,7 +341,7 @@ const EdulxPayments: React.FC = () => {
       dataIndex: 'receiptUrl',
       key: 'receiptUrl',
       render: (url: string) => (
-        url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">View Receipt</a> : 'N/A'
+        url ? <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline dark:text-blue-400">View Receipt</a> : <span className="text-gray-500 dark:text-gray-400">N/A</span>
       ),
     },
     {
@@ -341,12 +349,13 @@ const EdulxPayments: React.FC = () => {
       key: 'actions',
       render: (text: string, record: PaymentRecord) => (
         <Popconfirm
-          title="Are you sure you want to delete this payment record?"
+          title={<span className="text-dark dark:text-white">Are you sure you want to delete this payment record?</span>}
           onConfirm={() => record.id && handleDeletePayment(record.id, record.receiptUrl)}
           okText="Yes"
           cancelText="No"
+          overlayClassName="dark-popconfirm" // Add class for dark mode styling
         >
-          <Button size="small" danger icon={<DeleteOutlined />}>Delete</Button>
+          <Button size="small" danger icon={<DeleteOutlined />} className="dark:bg-red-700 dark:border-red-700 dark:hover:bg-red-600 dark:text-white">Delete</Button>
         </Popconfirm>
       ),
     },
@@ -370,7 +379,7 @@ const EdulxPayments: React.FC = () => {
       </Title>
 
       {/* Package Selection Section */}
-      <Card className="mb-8 bg-white dark:bg-darkgray shadow-md rounded-lg">
+      <Card className="mb-8 bg-white dark:bg-darkgray shadow-md rounded-lg dark:border-gray-700">
         <Title level={3} className="text-dark dark:text-white mb-4">
           Choose Your Edulx Package
         </Title>
@@ -378,28 +387,29 @@ const EdulxPayments: React.FC = () => {
           {EDULX_PACKAGES.map((pkg) => (
             <Col xs={24} md={8} key={pkg.name}>
               <Card
-                // Added responsive title for smaller screens
                 title={<span className="text-dark dark:text-white text-base sm:text-lg lg:text-xl">{pkg.name}</span>}
                 extra={
                   <Button
                     type="primary"
                     onClick={() => showPaymentModal(pkg)}
                     className="bg-primary text-white hover:bg-yellow-500 transition-colors"
-                    style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
+                    // Inline style for Ant Design primary button background/border
+                    style={{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}
                   >
                     Select Package
                   </Button>
                 }
                 className="package-card dark:border-gray-700 h-full flex flex-col justify-between"
-                headStyle={{ borderBottom: '1px solid #e8e8e8', paddingBottom: '16px' }}
+                // Ant Design Card header/body styles for dark mode
+                headStyle={{ borderBottom: '1px solid var(--color-border-light)', paddingBottom: '16px' }}
                 bodyStyle={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
               >
                 <div>
-                  <Text strong className="text-2xl text-primary block mb-2">
+                  <Text strong className="text-2xl text-primary block mb-2 dark:text-primary">
                     ₹{pkg.price.toLocaleString('en-IN')}
                   </Text>
                   {pkg.installments && (
-                    <Text type="secondary" className="block text-sm mb-2">
+                    <Text type="secondary" className="block text-sm mb-2 dark:text-gray-400">
                       ({pkg.installments} Installments)
                     </Text>
                   )}
@@ -407,7 +417,6 @@ const EdulxPayments: React.FC = () => {
                     {pkg.description}
                   </Paragraph>
                   <ul className="list-disc pl-5 text-gray-700 dark:text-gray-300 text-sm">
-                    {/* Render features based on showAllFeatures state */}
                     {showAllFeatures[pkg.name]
                       ? pkg.features.map((feature, index) => (
                           <li key={index}>{feature}</li>
@@ -417,7 +426,7 @@ const EdulxPayments: React.FC = () => {
                         ))}
                     {pkg.features.length > 5 && (
                       <li
-                        className="italic cursor-pointer text-blue-500 hover:underline"
+                        className="italic cursor-pointer text-blue-500 hover:underline dark:text-blue-400"
                         onClick={() =>
                           setShowAllFeatures((prev) => ({
                             ...prev,
@@ -437,7 +446,7 @@ const EdulxPayments: React.FC = () => {
       </Card>
 
       {/* Banking Details and QR Code Section */}
-      <Card className="mb-8 bg-white dark:bg-darkgray shadow-md rounded-lg">
+      <Card className="mb-8 bg-white dark:bg-darkgray shadow-md rounded-lg dark:border-gray-700">
         <Title level={3} className="text-dark dark:text-white mb-4">
           Payment Details
         </Title>
@@ -446,10 +455,10 @@ const EdulxPayments: React.FC = () => {
             <div className="mb-4">
               <Text strong className="block text-dark dark:text-white text-lg mb-2">Bank Account Details:</Text>
               <Paragraph className="text-gray-700 dark:text-gray-300">
-                <Text strong className="block">Account Name:</Text> {BANKING_DETAILS.accountName}<br />
-                <Text strong className="block">Account Number:</Text> {BANKING_DETAILS.accountNumber}<br />
-                <Text strong className="block">Bank:</Text> {BANKING_DETAILS.bankName}<br />
-                <Text strong className="block">IFSC Code:</Text> {BANKING_DETAILS.ifscCode}
+                <Text strong className="block text-dark dark:text-white">Account Name:</Text> {BANKING_DETAILS.accountName}<br />
+                <Text strong className="block text-dark dark:text-white">Account Number:</Text> {BANKING_DETAILS.accountNumber}<br />
+                <Text strong className="block text-dark dark:text-white">Bank:</Text> {BANKING_DETAILS.bankName}<br />
+                <Text strong className="block text-dark dark:text-white">IFSC Code:</Text> {BANKING_DETAILS.ifscCode}
               </Paragraph>
             </div>
           </Col>
@@ -458,7 +467,7 @@ const EdulxPayments: React.FC = () => {
             <img
               src={UPI_QR_CODE} // Use the imported image
               alt="QR Code for Payment"
-              className="max-w-[250px] mx-auto border border-gray-300 rounded"
+              className="max-w-[250px] mx-auto border border-gray-300 rounded dark:border-gray-700"
             />
             <Paragraph type="secondary" className="mt-2 text-gray-600 dark:text-gray-400">
               (Use any UPI app to scan and pay)
@@ -468,19 +477,19 @@ const EdulxPayments: React.FC = () => {
       </Card>
 
       {/* Payment History Section */}
-      <Card className="bg-white dark:bg-darkgray shadow-md rounded-lg">
+      <Card className="bg-white dark:bg-darkgray shadow-md rounded-lg dark:border-gray-700">
         <Title level={3} className="text-dark dark:text-white mb-4">
           Your Payment History
         </Title>
-        <Spin spinning={loading}>
+        <Spin spinning={loading} indicator={<Spin size="large" />}>
           <Table
             dataSource={payments}
             columns={columns}
             rowKey="id"
             pagination={{ pageSize: 5 }}
-            className="payment-history-table"
+            className="payment-history-table dark-ant-table" // Add class for dark mode table styling
             scroll={{ x: 'max-content' }}
-            locale={{ emptyText: <Text type="secondary">No payments uploaded yet.</Text> }}
+            locale={{ emptyText: <Text type="secondary" className="dark:text-gray-400">No payments uploaded yet.</Text> }}
           />
         </Spin>
       </Card>
@@ -493,7 +502,8 @@ const EdulxPayments: React.FC = () => {
         footer={null}
         centered
         width={600}
-        destroyOnHidden={true}
+        destroyOnClose={true} // Corrected: changed from destroyOnHidden to destroyOnClose
+        className="dark-modal" // Add class for dark mode modal styling
       >
         <Form
           form={form}
@@ -501,20 +511,25 @@ const EdulxPayments: React.FC = () => {
           onFinish={handlePaymentSubmit}
           initialValues={{ paymentMethod: 'Bank Transfer' }} // Default payment method
         >
-          <Form.Item name="packageName" label="Selected Package">
-            <Input disabled />
+          <Form.Item name="packageName" label={<span className="text-dark dark:text-white">Selected Package</span>}>
+            <Input disabled className="dark:bg-darkgraylight dark:text-white dark:border-gray-700" />
           </Form.Item>
-          <Form.Item name="packagePrice" label="Package Price">
-            <Input disabled />
+          <Form.Item name="packagePrice" label={<span className="text-dark dark:text-white">Package Price</span>}>
+            <Input disabled className="dark:bg-darkgraylight dark:text-white dark:border-gray-700" />
           </Form.Item>
 
           {selectedPackage?.name !== 'Starter' && (
             <Form.Item
               name="installmentNumber"
-              label="Installment Number"
+              label={<span className="text-dark dark:text-white">Installment Number</span>}
               rules={[{ required: true, message: 'Please select installment number!' }]}
             >
-              <Select placeholder="e.g., 1st, 2nd, 3rd" onChange={handleInstallmentChange}>
+              <Select
+                placeholder="e.g., 1st, 2nd, 3rd"
+                onChange={handleInstallmentChange}
+                className="dark-ant-select" // Add class for dark mode styling
+                dropdownClassName="dark-ant-select-dropdown" // Add class for dark mode dropdown
+              >
                 {selectedPackage?.installments &&
                   Array.from({ length: selectedPackage.installments }, (_, i) => i + 1).map((num) => (
                     <Option key={num} value={num}>{`${num}${num === 1 ? 'st' : num === 2 ? 'nd' : num === 3 ? 'rd' : 'th'} Installment`}</Option>
@@ -525,7 +540,7 @@ const EdulxPayments: React.FC = () => {
 
           <Form.Item
             name="amountPaid"
-            label="Amount You Paid (₹)"
+            label={<span className="text-dark dark:text-white">Amount You Paid (₹)</span>}
             rules={[
               { required: true, message: 'Please enter the amount you paid!' },
               {
@@ -542,28 +557,30 @@ const EdulxPayments: React.FC = () => {
               },
             ]}
           >
-            <Input type="number" placeholder="e.g., 23333 (for an installment) or 69999" />
+            <Input type="number" placeholder="e.g., 23333 (for an installment) or 69999" className="dark:bg-darkgraylight dark:text-white dark:border-gray-700" />
           </Form.Item>
 
           <Form.Item
             name="paymentMethod"
-            label="Payment Method"
+            label={<span className="text-dark dark:text-white">Payment Method</span>}
             rules={[{ required: true, message: 'Please select payment method!' }]}
           >
-            <Select>
+            <Select
+              className="dark-ant-select" // Add class for dark mode styling
+              dropdownClassName="dark-ant-select-dropdown" // Add class for dark mode dropdown
+            >
               <Option value="Bank Transfer">Bank Transfer</Option>
               <Option value="UPI">UPI (QR Code)</Option>
-              {/* Add other methods if applicable */}
             </Select>
           </Form.Item>
 
-          <Form.Item name="transactionId" label="Transaction ID (Optional)">
-            <Input placeholder="Enter transaction ID if available" />
+          <Form.Item name="transactionId" label={<span className="text-dark dark:text-white">Transaction ID (Optional)</span>}>
+            <Input placeholder="Enter transaction ID if available" className="dark:bg-darkgraylight dark:text-white dark:border-gray-700" />
           </Form.Item>
 
           <Form.Item
             name="receiptUpload"
-            label="Upload Payment Receipt (JPG, PNG, PDF)"
+            label={<span className="text-dark dark:text-white">Upload Payment Receipt (JPG, PNG, PDF)</span>}
             valuePropName="fileList"
             getValueFromEvent={(e: any) => e?.fileList}
             rules={[{ required: true, message: 'Please upload your payment receipt!' }]}
@@ -575,12 +592,12 @@ const EdulxPayments: React.FC = () => {
               onRemove={() => setFileList([])}
               fileList={fileList}
             >
-              <Button icon={<UploadOutlined />} >Select File</Button>
+              <Button icon={<UploadOutlined />} className="dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600 dark:hover:border-gray-500">Select File</Button>
             </Upload>
           </Form.Item>
 
           <Form.Item className="mt-4 flex justify-end">
-            <Button onClick={handlePaymentModalCancel} className="mr-2 dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600">
+            <Button onClick={handlePaymentModalCancel} className="mr-2 dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600 dark:border-gray-700">
               Cancel
             </Button>
             <Button
@@ -588,7 +605,7 @@ const EdulxPayments: React.FC = () => {
               htmlType="submit"
               icon={<DollarOutlined />}
               className="bg-primary text-white hover:bg-yellow-500 transition-colors"
-              style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
+              style={{ backgroundColor: 'var(--color-primary)', borderColor: 'var(--color-primary)' }}
               loading={loading}
             >
               Submit Payment

@@ -1,5 +1,5 @@
 // src/components/dashboard/DailyActivity.tsx
-import { Link } from "react-router-dom"; // Ensure react-router-dom Link if you're using it consistently
+// import { Link } from "react-router-dom"; // Removed as it's not used
 import { Icon } from "@iconify/react"; // For the title icon
 import dayjs from "dayjs"; // For formatting timestamps
 import { useLoginActivity } from "src/hooks/useLoginActivity"; // Import the new custom hook
@@ -35,7 +35,7 @@ const DailyActivity = () => {
           <div className="bg-lightinfo text-info p-3 rounded-md"> {/* Adjust background and text color as desired */}
             <Icon icon="solar:history-linear" height={24} /> {/* An icon relevant to activity/history */}
           </div>
-          <h5 className="card-title mb-0">Daily Activities</h5> {/* No margin-bottom here to align with icon */}
+          <h5 className="card-title mb-0 text-dark dark:text-white">Daily Activities</h5> {/* No margin-bottom here to align with icon */}
         </div>
 
         <div className="flex flex-col mt-2">
@@ -46,17 +46,18 @@ const DailyActivity = () => {
                 // Ensure timestamp exists and is a valid Firestore Timestamp before converting
                 // Firestore Timestamp has a .toDate() method
                 const date = item.timestamp?.toDate();
-                
+
                 // Format the time and full date using dayjs
                 const time = date ? dayjs(date).format("HH:mm") : "N/A";
                 const fullDate = date ? dayjs(date).format("MMM DD, YYYY") : "N/A"; // e.g., "Jun 19, 2025"
-                
+
                 // Customize the activity description
                 const activityDescription = `Logged in on ${fullDate}`;
 
                 return (
                   // Using item.id as key is preferred for performance and stability
-                  <li key={item.id || index}> 
+                  // Fallback to index if item.id is not available or unique
+                  <li key={item.id || `activity-${index}`}>
                     <div className="flex gap-4 min-h-16">
                       <div className="">
                         <p className="text-gray-600 dark:text-gray-400">{time}</p> {/* Style time */}
@@ -66,7 +67,7 @@ const DailyActivity = () => {
                         <div className={`rounded-full bg-primary p-1.5 w-fit`}></div>
                         {/* Render the vertical line only if it's not the last item in the list */}
                         {index < loginActivities.length - 1 && (
-                          <div className={`h-full w-px bg-border`}></div>
+                          <div className={`h-full w-px bg-border dark:bg-gray-600`}></div>
                         )}
                       </div>
                       <div className="">
@@ -80,7 +81,7 @@ const DailyActivity = () => {
             ) : (
               // Message displayed when there are no login activities
               <li>
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                   No login activities found yet. Log in to see your history!
                 </div>
               </li>
