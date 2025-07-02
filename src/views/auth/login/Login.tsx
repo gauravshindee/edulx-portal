@@ -5,7 +5,7 @@ import {
 } from "firebase/auth";
 import { auth } from "src/firebase";
 import FullLogo from "src/layouts/full/shared/logo/FullLogo";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // Import useNavigate
 import { getFriendlyFirebaseError } from "src/utils/firebaseErrorMessages";
 
 const gradientStyle = {
@@ -22,6 +22,7 @@ const Login = () => {
   const [message, setMessage] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [showReset, setShowReset] = useState(false);
+  const navigate = useNavigate(); // Initialize useNavigate hook
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -34,7 +35,8 @@ const Login = () => {
       await signInWithEmailAndPassword(auth, form.email, form.password);
       setMessage("✅ Login successful. Redirecting...");
       setTimeout(() => {
-        window.location.href = "/portal";
+        // CRITICAL CHANGE: Use navigate('/') instead of window.location.href = "/portal";
+        navigate("/"); // Redirect to the dashboard root path defined in Router.tsx
       }, 1000);
     } catch (error: any) {
       setMessage("❌ " + getFriendlyFirebaseError(error.code));
@@ -88,18 +90,17 @@ const Login = () => {
                 Login
               </button>
               <div className="w-full text-center">
-  <button
-    type="button"
-    onClick={() => setShowReset(true)}
-    className="text-sm text-primary underline"
-  >
-<h3 className="text-lg font-medium mb-1 text-center">Forgot Password?</h3>
-<p className="text-sm text-center text-gray-600 mb-4">
-  No worries — just enter your email and we’ll send you a reset link.
-</p>
-
-  </button>
-</div>
+                <button
+                  type="button"
+                  onClick={() => setShowReset(true)}
+                  className="text-sm text-primary underline"
+                >
+                  <h3 className="text-lg font-medium mb-1 text-center">Forgot Password?</h3>
+                  <p className="text-sm text-center text-gray-600 mb-4">
+                    No worries — just enter your email and we’ll send you a reset link.
+                  </p>
+                </button>
+              </div>
 
               {message && (
                 <p className="text-center text-sm mt-2">{message}</p>
