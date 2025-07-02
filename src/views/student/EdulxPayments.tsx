@@ -170,7 +170,7 @@ const EdulxPayments: React.FC = () => {
   };
 
   // Handles installment number change to auto-fill amount
-  const handleInstallmentChange = (value: number) => {
+  const handleInstallmentChange = (_value: number) => {
     if (selectedPackage && selectedPackage.installments) {
       const amountPerInstallment = selectedPackage.price / selectedPackage.installments;
       form.setFieldsValue({
@@ -308,9 +308,9 @@ const EdulxPayments: React.FC = () => {
       title: 'Package',
       dataIndex: 'packageName',
       key: 'packageName',
-      render: (text: string, record: PaymentRecord) => (
+      render: (text: string, record: PaymentRecord) => ( // THIS IS LINE 311
         <span className="text-dark dark:text-white">
-          {text} {record.installmentNumber ? `(Installment ${record.installmentNumber})` : ''}
+          {text} {record.installmentNumber ? `(Installment ${record.installmentNumber})` : ''} // THIS IS LINE 313
         </span>
       ),
     },
@@ -347,7 +347,7 @@ const EdulxPayments: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (text: string, record: PaymentRecord) => (
+      render: (_text: string, record: PaymentRecord) => (
         <Popconfirm
           title={<span className="text-dark dark:text-white">Are you sure you want to delete this payment record?</span>}
           onConfirm={() => record.id && handleDeletePayment(record.id, record.receiptUrl)}

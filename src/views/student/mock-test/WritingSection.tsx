@@ -9,7 +9,14 @@ interface WritingSectionProps {
   onSectionEnd: () => void;
 }
 
-const WritingSection: React.FC<WritingSectionProps> = ({ data, onAnswersChange, isTestActive, onSectionEnd }) => {
+const WritingSection: React.FC<WritingSectionProps> = ({
+  data,
+  onAnswersChange,
+  // Prefix with underscore to signal that these props are intentionally not used
+  // within this component's logic.
+  isTestActive: _isTestActive,
+  onSectionEnd: _onSectionEnd,
+}) => {
   const [task1Answer, setTask1Answer] = useState<string>('');
   const [task2Answer, setTask2Answer] = useState<string>('');
 

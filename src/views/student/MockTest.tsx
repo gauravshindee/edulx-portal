@@ -275,7 +275,8 @@ const MockTest: React.FC = () => {
           <Box>
             {/* Timer and Navigation Buttons */}
             <Grid container spacing={2} alignItems="center" className="mb-4 md:mb-6">
-              <Grid item xs={12} sm={6}>
+              {/* @ts-ignore */}
+<Grid item xs={12} sm={6} component="div">
                 <Typography variant="h6" className="text-dark dark:text-white">
                   {steps[activeStep]} Section - Time Remaining: {formatTime(currentSectionTime)}
                 </Typography>
@@ -292,7 +293,8 @@ const MockTest: React.FC = () => {
                   }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6} className="text-center sm:text-right">
+              {/* @ts-ignore */}
+<Grid item xs={12} sm={6} className="text-center sm:text-right" component="div">
                 <Button
                   variant="outlined"
                   className="border-primary text-primary hover:bg-primary/10 hover:border-yellow-600 mr-1 mb-2 sm:mb-0 rounded-lg capitalize"

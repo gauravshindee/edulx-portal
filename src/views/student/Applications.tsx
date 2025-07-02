@@ -20,7 +20,7 @@ import { db, auth } from "src/firebase"; // Adjust path as per your firebase.ts 
 
 // Type definitions for PapaParse results (if @types/papaparse is installed)
 import type { ParseResult, ParseError } from 'papaparse';
-import type { UploadFile, RcFile } from 'antd/lib/upload/interface'; // For precise typing of Upload's beforeUpload
+import type { RcFile } from 'antd/lib/upload/interface'; // For precise typing of Upload's beforeUpload
 
 // Define the interface for an Application (matches your previous definition)
 interface Application {
@@ -220,69 +220,40 @@ const Applications: React.FC = () => {
   // NEW DELETION LOGIC ENDS HERE
   // ***********************************************
 
+// 5. Handle File Upload (CSV/XLSX) and Save to Firestore
+// Explicitly type the parameters and return type for beforeUpload
+const handleFileUpload = async (file: RcFile, _fileList: RcFile[]): Promise<boolean> => { // Changed return type to Promise<boolean>
+  if (!user) {
+    message.error("Please log in to upload applications.");
+    return false; // Return false to prevent upload
+  }
 
-  // 5. Handle File Upload (CSV/XLSX) and Save to Firestore
-  // Explicitly type the parameters and return type for beforeUpload
-  const handleFileUpload = async (file: RcFile): Promise<boolean | UploadFile<any>> => {
-    if (!user) {
-      message.error("Please log in to upload applications.");
-      return Promise.reject(false); // Reject the upload if no user
-    }
+  // Basic validation (optional, but good practice)
+  const isCsvOrXlsx = file.name.endsWith('.csv') || file.name.endsWith('.xlsx');
+  if (!isCsvOrXlsx) {
+    message.error('You can only upload CSV or XLSX file!');
+    return false; // Stop upload
+  }
+  const isLt2M = file.size / 1024 / 1024 < 2; // Example: Max 2MB file size
+  if (!isLt2M) {
+    message.error('File must be smaller than 2MB!');
+    return false; // Stop upload
+  }
 
-    return new Promise<boolean>((resolve, reject) => { // Promise resolves to boolean
-      const reader = new FileReader();
-      reader.onload = async (e) => { // Made async to await Firestore operations
-        const data = e.target?.result;
-        let parsedData: Application[] = [];
+  return new Promise<boolean>((resolve) => { // Promise resolves to boolean
+    const reader = new FileReader();
+    reader.onload = async (e) => { // Made async to await Firestore operations
+      const data = e.target?.result;
+      let parsedData: Application[] = [];
 
-        try {
-          if (file.name.endsWith('.csv')) {
-            // @ts-ignore - Ignore if @types/papaparse is not installed
-            Papa.parse(data as string, {
-              header: true,
-              skipEmptyLines: true,
-              complete: async (results: ParseResult<any>) => { // Explicitly type results
-                parsedData = results.data.map((row: any) => ({
-                  userId: user.uid, // Assign userId for imported data
-                  city: row.City || '',
-                  university: row.University || '',
-                  course: row.Course || '',
-                  intake: row.Intake || '',
-                  universityLink: row['University link'] || '',
-                  applicationDeadline: row['Application deadline'] || '',
-                  profileFit: (row['Profile Fit'] as 'High' | 'Medium' | 'Low') || 'Medium',
-                  priority: (row.Priority as 'High' | 'Medium' | 'Low') || 'Medium',
-                  applicationStatus: (row['Application Status'] as 'Not Started' | 'In Progress' | 'Applied' | 'Admitted' | 'Rejected' | 'Deferred') || 'Not Started',
-                  result: row.Result || '',
-                  applicationFees: Number(row['Application Fees']) || 0,
-                  comments: row.Comments || '',
-                }));
-
-                // Batch add to Firestore
-                let addedCount = 0;
-                for (const app of parsedData) {
-                  try {
-                    await addDoc(collection(db, `users/${user.uid}/applications`), app);
-                    addedCount++;
-                  } catch (batchError) {
-                    console.error("Error adding one application from CSV:", app, batchError);
-                  }
-                }
-                message.success(`${addedCount} applications added from CSV!`);
-                resolve(true); // Resolve with true for successful upload
-              },
-              error: (err: ParseError) => { // Explicitly type err
-                message.error(`CSV parsing error: ${err.message}`);
-                reject(false); // Reject with false for failed upload
-              }
-            });
-          } else if (file.name.endsWith('.xlsx')) {
-            const workbook = XLSX.read(data, { type: 'binary' });
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(sheet);
-
-            parsedData = json.map((row: any) => ({
+      try {
+        if (file.name.endsWith('.csv')) {
+          // @ts-ignore - Ignore if @types/papaparse is not installed
+          Papa.parse(data as string, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results: ParseResult<any>) => { // Explicitly type results
+              parsedData = results.data.map((row: any) => ({
                 userId: user.uid, // Assign userId for imported data
                 city: row.City || '',
                 university: row.University || '',
@@ -296,38 +267,77 @@ const Applications: React.FC = () => {
                 result: row.Result || '',
                 applicationFees: Number(row['Application Fees']) || 0,
                 comments: row.Comments || '',
-            }));
+              }));
 
-            // Batch add to Firestore
-            let addedCount = 0;
-            for (const app of parsedData) {
-              try {
-                await addDoc(collection(db, `users/${user.uid}/applications`), app);
-                addedCount++;
-              } catch (batchError) {
-                console.error("Error adding one application from XLSX:", app, batchError);
+              // Batch add to Firestore
+              let addedCount = 0;
+              for (const app of parsedData) {
+                try {
+                  await addDoc(collection(db, `users/${user.uid}/applications`), app);
+                  addedCount++;
+                } catch (batchError) {
+                  console.error("Error adding one application from CSV:", app, batchError);
+                }
               }
+              message.success(`${addedCount} applications added from CSV!`);
+              resolve(true); // Resolve with true for successful upload
+            },
+            error: (err: ParseError) => { // Explicitly type err
+              message.error(`CSV parsing error: ${err.message}`);
+              resolve(false); // Resolve with false for failed upload
             }
-            message.success(`${addedCount} applications added from XLSX!`);
-            resolve(true); // Resolve with true for successful upload
-          } else {
-            message.error('Unsupported file type. Please upload a .csv or .xlsx file.');
-            reject(false); // Reject with false for unsupported file type
-          }
-        } catch (parseError) {
-          console.error("Error processing uploaded file:", parseError);
-          message.error('Error processing file. Please check its content.');
-          reject(false); // Reject with false for other parsing errors
-        }
-      };
-      reader.onerror = (_error: ProgressEvent<FileReader>) => { // Used _error to suppress unused variable warning
-        message.error('Error reading file.');
-        reject(false); // Reject with false for file reading errors
-      };
-      reader.readAsBinaryString(file);
-    });
-  };
+          });
+        } else if (file.name.endsWith('.xlsx')) {
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const json = XLSX.utils.sheet_to_json(sheet);
 
+          parsedData = json.map((row: any) => ({
+              userId: user.uid, // Assign userId for imported data
+              city: row.City || '',
+              university: row.University || '',
+              course: row.Course || '',
+              intake: row.Intake || '',
+              universityLink: row['University link'] || '',
+              applicationDeadline: row['Application deadline'] || '',
+              profileFit: (row['Profile Fit'] as 'High' | 'Medium' | 'Low') || 'Medium',
+              priority: (row.Priority as 'High' | 'Medium' | 'Low') || 'Medium',
+              applicationStatus: (row['Application Status'] as 'Not Started' | 'In Progress' | 'Applied' | 'Admitted' | 'Rejected' | 'Deferred') || 'Not Started',
+              result: row.Result || '',
+              applicationFees: Number(row['Application Fees']) || 0,
+              comments: row.Comments || '',
+          }));
+
+          // Batch add to Firestore
+          let addedCount = 0;
+          for (const app of parsedData) {
+            try {
+              await addDoc(collection(db, `users/${user.uid}/applications`), app);
+              addedCount++;
+            } catch (batchError) {
+              console.error("Error adding one application from XLSX:", app, batchError);
+            }
+          }
+          message.success(`${addedCount} applications added from XLSX!`);
+          resolve(true); // Resolve with true for successful upload
+        } else {
+          message.error('Unsupported file type. Please upload a .csv or .xlsx file.');
+          resolve(false); // Resolve with false for unsupported file type
+        }
+      } catch (parseError) {
+        console.error("Error processing uploaded file:", parseError);
+        message.error('Error processing file. Please check its content.');
+        resolve(false); // Resolve with false for other parsing errors
+      }
+    };
+    reader.onerror = (_error: ProgressEvent<FileReader>) => { // Used _error to suppress unused variable warning
+      message.error('Error reading file.');
+      resolve(false); // Resolve with false for file reading errors
+    };
+    reader.readAsBinaryString(file);
+  });
+};
 
   const showAddModal = () => {
     setEditingApplication(null);

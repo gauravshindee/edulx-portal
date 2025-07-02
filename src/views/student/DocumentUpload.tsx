@@ -199,7 +199,7 @@ const DocumentUpload = () => {
           <Progress
             percent={completionPercentage}
             status={completionPercentage === 100 ? 'success' : 'active'}
-            format={(percent) => `${uploaded}/${total} Uploaded (${percent.toFixed(0)}%)`}
+            format={(percent) => `${uploaded}/${total} Uploaded (${(percent ?? 0).toFixed(0)}%)`}
             strokeColor={{
               from: '#374151', // Dark grey/blue
               to: '#FBCC32',   // Yellow/gold

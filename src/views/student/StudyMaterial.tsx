@@ -1,6 +1,6 @@
 // src/views/student/StudyMaterial.tsx
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react'; // Removed useEffect
 import { Card, Typography, List, Button, Modal, Spin, message, Row, Col } from 'antd';
 import { FolderOutlined, FilePdfOutlined, DownloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { Document, Page, pdfjs } from 'react-pdf';

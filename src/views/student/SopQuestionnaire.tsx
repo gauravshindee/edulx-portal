@@ -119,7 +119,7 @@ const SopQuestionnaire = () => {
           <Progress
             percent={completionPercentage}
             status={completionPercentage === 100 ? 'success' : 'active'}
-            format={(percent) => `${answeredQuestions}/${totalQuestions} answered (${percent.toFixed(0)}%)`}
+            format={(percent) => `${answeredQuestions}/${totalQuestions} answered (${percent !== undefined ? percent.toFixed(0) : '0'}%)`}
             strokeColor={{
               from: '#374151', // Dark grey/blue
               to: '#FBCC32',   // Yellow/gold

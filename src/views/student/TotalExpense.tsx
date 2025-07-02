@@ -1,17 +1,17 @@
-// src/views/student/TotalExpense.tsx
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Modal, Form, Input, Select, DatePicker, message, Card, Statistic, Table, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { collection, addDoc, updateDoc, deleteDoc, doc, query, onSnapshot, Timestamp } from 'firebase/firestore';
 import { db, auth } from 'src/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import type { ColumnsType } from 'antd/es/table'; // Import ColumnsType
+import type { Breakpoint } from 'antd/es/_util/responsiveObserver'; // Import Breakpoint
 
 const { Option } = Select;
 
 // Define the interface for an Expense
-export interface Expense { // Exported for use in other files like the custom hook
+export interface Expense {
   id?: string;
   userId: string;
   expenseType: string;
@@ -58,7 +58,7 @@ const TotalExpense: React.FC = () => {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [form] = Form.useForm();
   const [selectedExpenseType, setSelectedExpenseType] = useState<string | null>(null);
-  const [selectedPackageType, setSelectedPackageType] = useState<'Pro' | 'Premium' | null>(null);
+  // Removed selectedPackageType as it's redundant and caused an unused variable error
 
   // Auth State Listener
   useEffect(() => {
@@ -73,7 +73,7 @@ const TotalExpense: React.FC = () => {
   }, []);
 
   // Fetch Expenses from Firestore (real-time)
-  useEffect(() => {
+  const fetchExpenses = useCallback(() => {
     if (!user) {
       setLoading(false);
       return;
@@ -105,7 +105,12 @@ const TotalExpense: React.FC = () => {
     );
 
     return () => unsubscribeFirestore();
-  }, [user]);
+  }, [user]); // Re-run effect if user changes
+
+  useEffect(() => {
+    fetchExpenses();
+  }, [fetchExpenses]);
+
 
   const totalExpenditure = expenses.reduce((sum, expense) => sum + expense.amount, 0);
 
@@ -118,15 +123,14 @@ const TotalExpense: React.FC = () => {
       });
       setSelectedExpenseType(expense.expenseType);
       if (expense.expenseType === "EduLX Package") {
-        setSelectedPackageType(expense.packageType || null);
+        form.setFieldValue('packageType', expense.packageType || null); // Set package type directly on form
       } else {
-        setSelectedPackageType(null);
+        form.setFieldValue('packageType', undefined); // Clear package type
       }
     } else {
       setEditingExpense(null);
       form.resetFields();
       setSelectedExpenseType(null);
-      setSelectedPackageType(null);
       form.setFieldValue('date', dayjs()); // Set default date to today for new expense
       form.setFieldValue('amount', null); // Clear amount for new expense
     }
@@ -138,19 +142,16 @@ const TotalExpense: React.FC = () => {
     setEditingExpense(null);
     form.resetFields();
     setSelectedExpenseType(null);
-    setSelectedPackageType(null);
   };
 
   const handleExpenseTypeChange = (value: string) => {
     setSelectedExpenseType(value);
-    setSelectedPackageType(null); // Reset package type when expense type changes
     if (value !== "EduLX Package") {
       form.setFieldsValue({ packageType: undefined, amount: null, description: undefined, installmentNumber: undefined });
     }
   };
 
   const handlePackageTypeChange = (value: 'Pro' | 'Premium') => {
-    setSelectedPackageType(value);
     const packageInfo = EDULX_PACKAGES[value];
     if (packageInfo) {
       const installmentAmount = Math.ceil(packageInfo.price / packageInfo.installments);
@@ -190,7 +191,8 @@ const TotalExpense: React.FC = () => {
     try {
       if (editingExpense?.id) {
         const docRef = doc(db, `users/${user.uid}/expenses`, editingExpense.id);
-        await updateDoc(docRef, expenseData);
+        // Cast to any to satisfy TypeScript for updateDoc's argument type
+        await updateDoc(docRef, expenseData as { [key: string]: any });
         message.success('Expense updated successfully!');
       } else {
         await addDoc(collection(db, `users/${user.uid}/expenses`), expenseData);
@@ -223,27 +225,28 @@ const TotalExpense: React.FC = () => {
     }
   };
 
-  const columns = [
+  const columns: ColumnsType<Expense> = [ // Explicitly type columns
     {
       title: 'Date',
       dataIndex: 'date',
       key: 'date',
-      render: (text: string) => dayjs(text).format('MMM D, YYYY'), // Corrected format for space
+      render: (_text: string, record: Expense) => dayjs(record.date).format('MMM D, YYYY'), // Use _text for unused param
       sorter: (a: Expense, b: Expense) => dayjs(a.date).unix() - dayjs(b.date).unix(),
+      responsive: ['xs'] as Breakpoint[], // Type assertion for responsive array
     },
     {
       title: 'Expense Type',
       dataIndex: 'expenseType',
       key: 'expenseType',
       sorter: (a: Expense, b: Expense) => a.expenseType.localeCompare(b.expenseType),
-      // Added responsive design for expense type
-      responsive: ['md'],
+      responsive: ['md'] as Breakpoint[], // Type assertion
     },
     {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      responsive: ['sm', 'md', 'lg'] as Breakpoint[], // Type assertion
     },
     {
       title: 'Amount (₹)',
@@ -252,11 +255,12 @@ const TotalExpense: React.FC = () => {
       render: (amount: number) => `₹${amount.toLocaleString('en-IN')}`,
       sorter: (a: Expense, b: Expense) => a.amount - b.amount,
       align: 'right' as 'right',
+      responsive: ['xs'] as Breakpoint[], // Type assertion
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (text: string, record: Expense) => (
+      render: (_text: string, record: Expense) => ( // Use _text for unused param
         <div className="flex space-x-2 justify-end">
           <Button
             size="small"
@@ -280,6 +284,7 @@ const TotalExpense: React.FC = () => {
       ),
       align: 'center' as 'center',
       width: 150, // Fixed width for actions column
+      responsive: ['xs'] as Breakpoint[], // Type assertion
     },
   ];
 
@@ -317,8 +322,6 @@ const TotalExpense: React.FC = () => {
           icon={<PlusOutlined />}
           onClick={() => showModal()}
           className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:bg-primary-dark dark:hover:bg-yellow-600 dark:border-primary-dark"
-          // Removed inline style as it's typically handled by Tailwind/Ant Design primary colors and dark mode classes
-          // style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
         >
           Add New Expense
         </Button>
@@ -392,28 +395,15 @@ const TotalExpense: React.FC = () => {
             <Select
               placeholder="Select Expense Type"
               onChange={handleExpenseTypeChange}
-              className="select-md"
+              // Rely purely on className for background, border, and text color
+              className="select-md dark:bg-darkgray-800 dark:border-gray-600 dark:text-white"
               dropdownStyle={{ backgroundColor: 'var(--darkgray-700)' }} // Dark mode for dropdown
               optionFilterProp="children"
               optionLabelProp="children"
               popupClassName="dark-select-dropdown" // Custom class for dark mode dropdown options
-              // Custom styles for Ant Design Select in dark mode
-              styles={{
-                selector: {
-                  backgroundColor: 'var(--darkgray-800)',
-                  border: '1px solid var(--gray-600)',
-                  color: 'white',
-                },
-                input: {
-                  color: 'white',
-                },
-                singleValue: {
-                  color: 'white',
-                },
-                placeholder: {
-                  color: 'var(--gray-400)',
-                }
-              }}
+              // *** Removed styles prop entirely as it was the source of errors ***
+              // You will need to ensure your Tailwind CSS setup or global Ant Design theme
+              // is correctly applying styles for placeholder and selected text color.
             >
               {EXPENSE_CATEGORIES.map(category => (
                 <Option key={category} value={category} className="dark:bg-darkgray-700 dark:text-white">
@@ -432,27 +422,13 @@ const TotalExpense: React.FC = () => {
               <Select
                 placeholder="Select EduLX Package"
                 onChange={handlePackageTypeChange}
-                className="select-md"
+                // Rely purely on className for background, border, and text color
+                className="select-md dark:bg-darkgray-800 dark:border-gray-600 dark:text-white"
                 dropdownStyle={{ backgroundColor: 'var(--darkgray-700)' }}
                 optionFilterProp="children"
                 optionLabelProp="children"
                 popupClassName="dark-select-dropdown"
-                styles={{
-                  selector: {
-                    backgroundColor: 'var(--darkgray-800)',
-                    border: '1px solid var(--gray-600)',
-                    color: 'white',
-                  },
-                  input: {
-                    color: 'white',
-                  },
-                  singleValue: {
-                    color: 'white',
-                  },
-                  placeholder: {
-                    color: 'var(--gray-400)',
-                  }
-                }}
+                // *** Removed styles prop entirely as it was the source of errors ***
               >
                 <Option value="Pro" className="dark:bg-darkgray-700 dark:text-white">Pro (₹69,999)</Option>
                 <Option value="Premium" className="dark:bg-darkgray-700 dark:text-white">Premium (₹1,29,999)</Option>
@@ -508,8 +484,6 @@ const TotalExpense: React.FC = () => {
               format="YYYY-MM-DD"
               className="dark:bg-darkgray-800 dark:border-gray-600 dark:text-white"
               // Ensure the panel itself respects dark mode, usually handled by Ant Design's theme or global styles
-              // but can be forced if necessary
-              // pickerClassName="dark:bg-darkgray-700" // This might not work directly, might need a custom popupStyle
             />
           </Form.Item>
 
@@ -522,8 +496,6 @@ const TotalExpense: React.FC = () => {
               htmlType="submit"
               icon={<PlusOutlined />}
               className="bg-primary text-white hover:bg-yellow-500 transition-colors dark:bg-primary-dark dark:hover:bg-yellow-600 dark:border-primary-dark"
-              // Removed inline style as it's typically handled by Tailwind/Ant Design primary colors and dark mode classes
-              // style={{ backgroundColor: '#FBCC32', borderColor: '#FBCC32' }}
             >
               {editingExpense ? "Update Expense" : "Add Expense"}
             </Button>

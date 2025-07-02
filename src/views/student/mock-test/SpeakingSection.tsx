@@ -1,6 +1,6 @@
 // src/views/student/mock-test/SpeakingSection.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, IconButton, Paper } from '@mui/material'; // Removed Divider as it was unused
+import { Box, Typography, Button, IconButton, Paper } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import StopIcon from '@mui/icons-material/Stop';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -36,7 +36,12 @@ interface SpeakingSectionProps {
   onSectionEnd: () => void;
 }
 
-const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange, isTestActive, onSectionEnd }) => {
+const SpeakingSection: React.FC<SpeakingSectionProps> = ({
+  data,
+  onAnswersChange,
+  isTestActive,
+  onSectionEnd, // Keeping this, as it's correctly used in useEffect
+}) => {
   const [recording, setRecording] = useState<boolean>(false);
   const [audioURL, setAudioURL] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -62,10 +67,13 @@ const SpeakingSection: React.FC<SpeakingSectionProps> = ({ data, onAnswersChange
         const url = URL.createObjectURL(audioBlob);
         setAudioURL(url);
         audioChunksRef.current = []; // Clear chunks for next recording
-        onAnswersChange((prev: { [key: string]: string | null }) => ({
-          ...prev,
-          [`part${currentPart}`]: url, // Use currentPart state here
-        }));
+
+        // FIX: Calculate the new answers object first, then pass it directly to onAnswersChange
+        // This is because onAnswersChange is a prop, not a state setter like setCurrentAnswers.
+        const newAnswers = {
+            [`part${currentPart}`]: url,
+        };
+        onAnswersChange(newAnswers); // Pass the direct object
       };
       // Keep stream active to avoid re-requesting access on every recording start/stop
       // If you need to release the microphone after the test, manage the stream's lifecycle.

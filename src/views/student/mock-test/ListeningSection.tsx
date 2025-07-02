@@ -1,6 +1,7 @@
 // src/views/student/mock-test/ListeningSection.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, Button, RadioGroup, FormControlLabel, Radio, TextField, Grid, Paper } from '@mui/material';
+// Removed Grid as it was not being used
+import { Box, Typography, Button, RadioGroup, FormControlLabel, Radio, TextField, Paper } from '@mui/material';
 
 // Define more specific interfaces for better type safety
 interface Question {
@@ -28,8 +29,10 @@ const ListeningSection: React.FC<ListeningSectionProps> = ({
   data,
   onAnswersChange,
   isTestActive,
-  onSectionEnd,
-  currentSectionIndex, // Destructure new prop
+  // Correct way to destructure an existing prop and rename it locally with an underscore
+  // to signal it's intentionally unused within this component.
+  onSectionEnd: _onSectionEnd, // This line is corrected
+  currentSectionIndex,
 }) => {
   const [currentAnswers, setCurrentAnswers] = useState<{ [key: string]: string }>({});
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -64,6 +67,7 @@ const ListeningSection: React.FC<ListeningSectionProps> = ({
     // Optionally, call onSectionEnd here if the audio ending directly signals the end of the section
     // In IELTS, after audio, there's usually a short time to review, then section moves.
     // The parent timer usually handles this.
+    // If _onSectionEnd were to be called here: _onSectionEnd();
   };
 
   const handleAnswerChange = (questionId: string, value: string) => {

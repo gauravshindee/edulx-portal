@@ -1,4 +1,4 @@
-import { useState } from "react"; // Removed useEffect as it's not used
+import { useState } from "react";
 import { Select } from "flowbite-react";
 import { Icon } from "@iconify/react";
 import Chart from "react-apexcharts";
@@ -86,23 +86,23 @@ const allDocumentCategories: Record<DocumentCategoryKey, string[]> = {
 };
 
 // --- MOCK UPLOADED DOCUMENTS DATA ---
-// This object simulates the actual uploaded status of documents based on image_982e7e.png
+// This object simulates the actual uploaded status of documents based on image_e29162.png
 // ONLY includes documents from the provided DOCUMENT_TYPES list.
 // If a document from DOCUMENT_TYPES is not listed here, it's considered pending.
 const mockUploadedDocumentsStatus: Record<string, boolean> = {
-  "Passport Size Photo": true,  // From image_982e7e.png
-  "Passport PDF": true,       // From image_982e7e.png
-  "CV / Resume": true,        // From image_982e7e.png
-  "10th/12th Certificates": true, // From image_982e7e.png
-  "Degree & Transcripts": true,  // From image_982e7e.png
-  "APS Certificate": true,    // From image_982e7e.png
-  "Language Certificate": true,  // From image_982e7e.png
-  "LOR - Company": true,      // From image_982e7e.png
-  "LOR - Professor": true,    // From image_982e7e.png
-  "SOP Questionnaire": true,  // From image_982e7e.png
-  "Research Work": true,      // From image_982e7e.png
-  "Project Work": true,       // From image_982e7e.png
-  // The rest are assumed false (pending) if not explicitly in image_982e7e.png or mentioned
+  "Passport Size Photo": true,  // From image_e29162.png
+  "Passport PDF": true,       // From image_e29162.png
+  "CV / Resume": true,        // From image_e29162.png
+  "10th/12th Certificates": true, // From image_e29162.png
+  "Degree & Transcripts": true,  // From image_e29162.png
+  "APS Certificate": true,    // From image_e29162.png
+  "Language Certificate": true,  // From image_e29162.png
+  "LOR - Company": true,      // From image_e29162.png
+  "LOR - Professor": true,    // From image_e29162.png
+  "SOP Questionnaire": true,  // From image_e29162.png
+  "Research Work": true,      // From image_e29162.png
+  "Project Work": true,       // From image_e29162.png
+  // The rest are assumed false (pending) if not explicitly in image_e29162.png or mentioned
   "Internship Letters": false,
   "Extra Curriculars": false,
   "Entrance Exam Certificates": false,
@@ -178,32 +178,30 @@ const AdmissionSequences = () => {
         columnWidth: '60%', // Wider bars
         borderRadius: 4,
         distributed: true, // Crucial for applying colors array to individual bars
-        dataLabels: { // Data labels directly on bars (for titles)
-          enabled: true, // This is correctly placed here for bar-specific dataLabels
-          position: 'top',
-          offsetY: -10, // Adjust vertical position
-          formatter: function (_val: string | number, opts: any) { // Used _val to suppress unused variable warning
-            // Display the shortened label for each bar from docDisplayLabels
-            // Use opts.dataPointIndex to get the correct label
-            return docDisplayLabels[opts.dataPointIndex];
-          },
-          style: {
-            // Adjust color for better visibility on both yellow and dark bars
-            colors: ['var(--color-bodytext)'], // Consider 'white' for better contrast on dark theme/dark bars
-            fontSize: '11px',
-            fontWeight: 500,
-          },
-          textAnchor: 'middle', // Center the text
-          dropShadow: {
-            enabled: true,
-            top: 1, left: 1, blur: 1, opacity: 0.3
-          }
+        dataLabels: { // Properties here relate to positioning of data labels on the bar
+          position: 'top', // Position property moved back here
         }
       },
     },
-    // The main dataLabels property (not within plotOptions.bar)
+    // Top-level dataLabels to enable them and set their style for the series
     dataLabels: {
-      enabled: false, // Overall dataLabels is false, specific bar dataLabels are true
+      enabled: true, // This correctly enables the data labels for the series
+      offsetY: -10, // Adjust vertical position
+      formatter: function (_val: number, opts: any) { // Formatter
+        // Display the shortened label for each bar from docDisplayLabels
+        // Use opts.dataPointIndex to get the correct label
+        return docDisplayLabels[opts.dataPointIndex];
+      },
+      style: { // Style
+        colors: ['var(--color-bodytext)'],
+        fontSize: '11px',
+        fontWeight: 500,
+      },
+      textAnchor: 'middle', // Text anchor
+      dropShadow: { // Drop shadow
+        enabled: true,
+        top: 1, left: 1, blur: 1, opacity: 0.3
+      }
     },
     stroke: { show: false },
     xaxis: {
@@ -225,22 +223,17 @@ const AdmissionSequences = () => {
     tooltip: {
       enabled: true,
       y: {
-        // Corrected type for `_val` to `number` as per ApexOptions, suppressed unused warning
         formatter: function (_val: number, opts: any) {
           const color = docColors[opts.dataPointIndex];
           return color === 'var(--color-primary)' ? "Submitted" : "Pending";
         },
         title: {
-            // Changed parameter name to _seriesName to mark as unused
             formatter: (_seriesName: string) => '' // Hide series name
         }
       },
       x: {
-        // Corrected type for `val` to `string` as x-axis categories are strings
-        // ApexCharts `XAxisFormatter` for tooltip.x.formatter can accept string for category type.
-        formatter: function (val: string): string {
-          // This will show the full document name on hover
-          return val;
+        formatter: function (val: string | number): string {
+          return String(val);
         }
       },
       theme: "dark",
@@ -253,7 +246,6 @@ const AdmissionSequences = () => {
         width: 12,
         height: 12,
         radius: 6,
-        // Corrected fill colors for legend markers to match bar colors
         fillColors: ['var(--color-primary)', 'var(--color-primary-dark)']
       },
       itemMargin: {
@@ -264,7 +256,6 @@ const AdmissionSequences = () => {
       onItemHover: { highlightDataSeries: false },
       customLegendItems: ['Submitted', 'Pending'], // Manually define legend items
       labels: {
-        // Corrected text colors for legend labels to match bar colors
         colors: ['var(--color-primary)', 'var(--color-primary-dark)']
       },
     },
@@ -290,12 +281,9 @@ const AdmissionSequences = () => {
     <div className="rounded-xl dark:shadow-dark-md shadow-md bg-white dark:bg-darkgray p-6 relative w-full break-words">
       {/* Document Submission Status Section */}
       <div className="flex justify-between items-center mb-4">
-        <h5 className="card-title text-dark dark:text-white">Document Submission Status</h5> {/* Added dark mode text color */}
+        <h5 className="card-title text-dark dark:text-white">Document Submission Status</h5>
         <Select
           id="docCategory"
-          // Flowbite-React Select might need custom styling for dark mode
-          // Consider adding a custom class to target it, or using their theming
-          // Example: className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
           className="select-md dark:bg-darkgray-700 dark:border-gray-600 dark:text-white"
           value={selectedDocCategory}
           onChange={(e) => setSelectedDocCategory(e.target.value as DocumentCategoryKey)}
@@ -313,7 +301,7 @@ const AdmissionSequences = () => {
             ...optionsDocumentChart,
             xaxis: {
               ...optionsDocumentChart.xaxis,
-              categories: docCategories, // Ensure categories update with data
+              categories: docCategories,
             },
           }}
           series={graphSeries}
@@ -326,7 +314,7 @@ const AdmissionSequences = () => {
       </div>
 
       {/* Admission Process Steps Section (Horizontal Timeline) */}
-      <h5 className="card-title text-dark dark:text-white mb-4">Admission Process Steps</h5> {/* Added dark mode text color */}
+      <h5 className="card-title text-dark dark:text-white mb-4">Admission Process Steps</h5>
       <div className="relative overflow-x-auto py-0 custom-scrollbar-horizontal -mx-6">
         {studyAbroadProcessTimeline.length > 0 ? (
           <div className="flex flex-row justify-start min-w-max h-[140px] px-6">

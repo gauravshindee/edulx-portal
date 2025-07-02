@@ -1,6 +1,7 @@
 // src/views/student/mock-test/ReadingSection.tsx
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, TextField, Checkbox, FormControlLabel, RadioGroup, Radio, Paper } from '@mui/material';
+// Removed Checkbox as it was not being used
+import { Box, Typography, TextField, FormControlLabel, RadioGroup, Radio, Paper } from '@mui/material';
 
 interface ReadingSectionProps {
   data: any; // Reading passages and questions
@@ -9,11 +10,20 @@ interface ReadingSectionProps {
   onSectionEnd: () => void;
 }
 
-const ReadingSection: React.FC<ReadingSectionProps> = ({ data, onAnswersChange, isTestActive, onSectionEnd }) => {
-  const [currentAnswers, setCurrentAnswers] = useState<any>({});
+const ReadingSection: React.FC<ReadingSectionProps> = ({
+  data,
+  onAnswersChange,
+  // Prefix with underscore to signal that these props are intentionally not used
+  // within this component's logic.
+  isTestActive: _isTestActive,
+  onSectionEnd: _onSectionEnd,
+}) => {
+  // Although currentAnswers is useState<any>, it's good practice to define the structure
+  // if you know it, e.g., useState<{ [key: string]: string | boolean }>({});
+  const [currentAnswers, setCurrentAnswers] = useState<any>({}); // Keeping 'any' as per original
 
   const handleAnswerChange = (questionId: string, value: string | boolean) => {
-    setCurrentAnswers((prev) => ({
+    setCurrentAnswers((prev: Record<string, string | boolean>) => ({ // Explicitly type 'prev'
       ...prev,
       [questionId]: value,
     }));

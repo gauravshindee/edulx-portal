@@ -9,7 +9,7 @@ import { db, storage } from "src/firebase";
 import { useAuth } from "src/context/AuthContext";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import Select, { ActionMeta, SingleValue, MultiValue } from "react-select"; // Import types for react-select
+import Select, { SingleValue, MultiValue } from "react-select"; // Import types for react-select
 import makeAnimated from "react-select/animated";
 import {
   COUNTRIES, COURSES, // Keep only used imports
@@ -238,7 +238,7 @@ const MyProfile = () => {
     // Calculate profile completion progress dynamically
     const totalFields = Object.keys(initialForm).length;
 
-    const filledFields = Object.entries(form).filter(([key, value]) => {
+    const filledFields = Object.entries(form).filter(([_key, value]) => {
       // Exclude the profileImage related fields and other auxiliary states from completion calculation
       // Note: `keyof typeof initialForm` ensures that `key` is a valid form field name.
       // Auxiliary states like 'profileImage', 'uploadingImage', etc., are not part of initialForm,
