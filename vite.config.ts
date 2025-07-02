@@ -33,5 +33,5 @@ export default defineConfig({
   },
 
   plugins: [svgr(), react()],
-  base: '/portal', // ✅ updated from /MatDash
+  base: '/', // THIS IS THE CRITICAL CHANGE
 });
