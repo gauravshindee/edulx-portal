@@ -205,5 +205,6 @@ const Router = [
   },
 ];
 
-const router = createBrowserRouter(Router, { basename: '/portal' });
+// CRITICAL CHANGE: Remove the basename option here
+const router = createBrowserRouter(Router);
 export default router;
